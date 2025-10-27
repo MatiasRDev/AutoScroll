@@ -4,11 +4,12 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test"
+    "test": "vitest run"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",
     "javascript-obfuscator": "^4.1.0",
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.0.0",
+    "vitest": "^1.6.0"
   }
 }
