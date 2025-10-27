@@ -17,7 +17,7 @@ const PACKAGE_JSON = path.join(projectRoot, 'package.json');
 const BUNDLE_REQUIRE_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.bundle.js';
 const INSTALLER_URL =
-  'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.user.js';
+  'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js';
 
 function createInstaller(version) {
   return `// ==UserScript==\n` +
