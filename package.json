@@ -6,6 +6,7 @@
     "build": "node scripts/build.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.24.0",
+    "javascript-obfuscator": "^4.1.0"
   }
 }
