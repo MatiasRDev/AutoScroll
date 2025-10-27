@@ -7,90 +7,79 @@ import javascriptObfuscator from 'javascript-obfuscator';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
-const entryFile = path.join(projectRoot, 'src', 'autoscroll.source.js');
-const distDir = path.join(projectRoot, 'dist');
-const bundlePath = path.join(distDir, 'autoscroll.bundle.js');
-const installerPath = path.join(distDir, 'autoscroll.user.js');
-const rootInstallerPath = path.join(projectRoot, 'autoscroll.user.js');
-const packageJsonPath = path.join(projectRoot, 'package.json');
+
+const SOURCE_FILE = path.join(projectRoot, 'src', 'autoscroll.source.js');
+const DIST_DIR = path.join(projectRoot, 'dist');
+const BUNDLE_FILE = path.join(DIST_DIR, 'autoscroll.bundle.js');
+const INSTALLER_FILE = path.join(projectRoot, 'autoscroll.user.js');
+const PACKAGE_JSON = path.join(projectRoot, 'package.json');
 
 const BUNDLE_REQUIRE_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.bundle.js';
 const INSTALLER_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.user.js';
 
-function createInstallerHeader(version) {
-  return `// ==UserScript==\n`
-    + `// @name         AutoScroll\n`
-    + `// @namespace    https://matias.ramirez/autoscroll\n`
-    + `// @version      ${version}\n`
-    + `// @description  Auto-scroll configurable con panel avanzado\n`
-    + `// @match        http*://*/*\n`
-    + `// @updateURL    ${INSTALLER_URL}\n`
-    + `// @downloadURL  ${INSTALLER_URL}\n`
-    + `// @require      ${BUNDLE_REQUIRE_URL}\n`
-    + `// @grant        GM_getValue\n`
-    + `// @grant        GM_setValue\n`
-    + `// @grant        GM_addStyle\n`
-    + `// @grant        GM_registerMenuCommand\n`
-    + `// ==/UserScript==\n`;
+function createInstaller(version) {
+  return `// ==UserScript==\n` +
+    `// @name         AutoScroll\n` +
+    `// @namespace    https://matias.ramirez/autoscroll\n` +
+    `// @version      ${version}\n` +
+    `// @description  Auto-scroll configurable con panel avanzado\n` +
+    `// @match        http*://*/*\n` +
+    `// @updateURL    ${INSTALLER_URL}\n` +
+    `// @downloadURL  ${INSTALLER_URL}\n` +
+    `// @require      ${BUNDLE_REQUIRE_URL}\n` +
+    `// @grant        GM_getValue\n` +
+    `// @grant        GM_setValue\n` +
+    `// @grant        GM_addStyle\n` +
+    `// @grant        GM_registerMenuCommand\n` +
+    `// ==/UserScript==\n`;
 }
 
 async function build() {
   try {
     const [sourceCode, packageJson] = await Promise.all([
-      readFile(entryFile, 'utf8'),
-      readFile(packageJsonPath, 'utf8'),
+      readFile(SOURCE_FILE, 'utf8'),
+      readFile(PACKAGE_JSON, 'utf8'),
     ]);
 
-    const { version } = JSON.parse(packageJson);
-    if (!version) {
-      throw new Error('No se pudo leer la versión desde package.json');
-    }
-
     if (!sourceCode.trim()) {
-      throw new Error('El archivo de entrada está vacío');
+      throw new Error('El archivo de entrada "src/autoscroll.source.js" está vacío.');
     }
 
-    const esbuildResult = await esbuild.build({
-      entryPoints: [entryFile],
-      bundle: true,
-      format: 'iife',
+    const { version } = JSON.parse(packageJson);
+    if (typeof version !== 'string' || !version.trim()) {
+      throw new Error('No se pudo obtener la versión desde package.json');
+    }
+
+    const transformed = await esbuild.transform(sourceCode, {
+      loader: 'js',
       target: 'es2020',
-      platform: 'browser',
-      minify: false,
-      write: false,
+      minify: true,
+      legalComments: 'none',
     });
 
-    if (!esbuildResult.outputFiles?.length) {
-      throw new Error('esbuild no generó resultados');
-    }
-
-    const bundledCode = esbuildResult.outputFiles[0].text;
-
-    const obfuscationResult = javascriptObfuscator.obfuscate(bundledCode, {
+    const obfuscationResult = javascriptObfuscator.obfuscate(transformed.code, {
       compact: true,
-      controlFlowFlattening: false,
+      controlFlowFlattening: true,
+      controlFlowFlatteningThreshold: 0.5,
       deadCodeInjection: false,
       identifierNamesGenerator: 'hexadecimal',
       simplify: true,
       stringArray: true,
+      stringArrayEncoding: ['base64'],
       stringArrayThreshold: 0.75,
       target: 'browser',
     });
 
-    const obfuscatedCode = obfuscationResult.getObfuscatedCode();
+    await mkdir(DIST_DIR, { recursive: true });
+    await writeFile(BUNDLE_FILE, `${obfuscationResult.getObfuscatedCode()}\n`, 'utf8');
 
-    await mkdir(distDir, { recursive: true });
-    await writeFile(bundlePath, `${obfuscatedCode}\n`, 'utf8');
+    const installer = createInstaller(version);
+    await writeFile(INSTALLER_FILE, `${installer}\n`, 'utf8');
 
-    const installerHeader = createInstallerHeader(version);
-    const installerContent = `${installerHeader}\n`;
-    await writeFile(installerPath, installerContent, 'utf8');
-    await writeFile(rootInstallerPath, installerContent, 'utf8');
-
-    console.log(`Bundle generado en ${path.relative(projectRoot, bundlePath)}`);
-    console.log(`Instalador actualizado en ${path.relative(projectRoot, installerPath)}`);
+    console.log(`Bundle generado en ${path.relative(projectRoot, BUNDLE_FILE)}`);
+    console.log(`Instalador actualizado en ${path.relative(projectRoot, INSTALLER_FILE)}`);
   } catch (error) {
     console.error('Error durante la construcción:', error);
     process.exit(1);
