@@ -18,6 +18,8 @@ const BUNDLE_REQUIRE_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.bundle.js';
 const INSTALLER_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.user.js';
+const INSTALLER_COMMENT =
+  '// Archivo generado automáticamente. Ejecuta "npm run build" para regenerar.';
 
 function createInstallerHeader(version) {
   return `// ==UserScript==\n`
@@ -85,7 +87,7 @@ async function build() {
     await writeFile(bundlePath, `${obfuscatedCode}\n`, 'utf8');
 
     const installerHeader = createInstallerHeader(version);
-    const installerContent = `${installerHeader}\n`;
+    const installerContent = `${installerHeader}\n${INSTALLER_COMMENT}\n`;
     await writeFile(installerPath, installerContent, 'utf8');
     await writeFile(rootInstallerPath, installerContent, 'utf8');
 

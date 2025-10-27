@@ -13,3 +13,4 @@
 // @grant        GM_registerMenuCommand
 // ==/UserScript==
 
+// Archivo generado automáticamente. Ejecuta "npm run build" para regenerar.
