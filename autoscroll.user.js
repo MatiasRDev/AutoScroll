@@ -6,7 +6,10 @@
 // @match        http*://*/*
 // @updateURL    https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
 // @downloadURL  https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
-// @grant        none
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_addStyle
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 (function () {
