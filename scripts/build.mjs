@@ -1,7 +1,19 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as esbuild from 'esbuild';
+let esbuild;
+try {
+  esbuild = await import('esbuild');
+} catch (error) {
+  if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+    console.warn('No se pudo cargar esbuild:', error.message);
+  }
+}
+
+let jsmin;
+if (!esbuild) {
+  ({ minify: jsmin } = await import('./jsmin.mjs'));
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,11 +40,16 @@ async function build() {
     const header = source.slice(headerStart, headerCloseIndex).trimEnd();
     const body = source.slice(headerCloseIndex);
 
-    const { code } = await esbuild.transform(body, {
-      minify: true,
-      format: 'iife',
-      target: 'es2020',
-    });
+    let code;
+    if (esbuild) {
+      ({ code } = await esbuild.transform(body, {
+        minify: true,
+        format: 'iife',
+        target: 'es2020',
+      }));
+    } else {
+      code = jsmin(body);
+    }
 
     await mkdir(distDir, { recursive: true });
     const output = `${header}\n\n${code}\n`;
