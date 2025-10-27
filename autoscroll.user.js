@@ -1,19 +1,12 @@
 // ==UserScript==
-// @name         AutoScroll Fluido • Panel configurable • Gestos • Pausa inteligente • Tira • Secciones • Perfiles • Infinite Scroll • Debug • Export/Import • Forzar subdominio • PSL-lite + Override
+// @name         AutoScroll
 // @namespace    https://matias.ramirez/autoscroll
-// @version      1.0
-// @description  Auto-scroll suave con panel avanzado: hotkeys, gestos (clics/t-clic), pausa inteligente (sin clicks de mouse), ocultar completo o con tira, secciones plegables, infinite scroll robusto, perfiles con forzado de subdominio, PSL-lite + override manual, y UI personalizable.
+// @version      1.0.0
+// @description  Auto-scroll configurable con panel avanzado
 // @match        http*://*/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=example.com
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_addStyle
-// @grant        GM_registerMenuCommand
-// @license      MIT
-// @homepageURL  https://github.com/MatiasRDev/AutoScroll
-// @supportURL   https://github.com/MatiasRDev/AutoScroll/issues
-// @updateURL    https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll-fluido.user.js
-// @downloadURL  https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll-fluido.user.js
+// @updateURL    https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
+// @downloadURL  https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
+// @grant        none
 // ==/UserScript==
 
 (function () {
