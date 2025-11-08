@@ -101,12 +101,20 @@ test('el bundle invoca las APIs GM al inicializar', async (t) => {
     doc.dispatchEvent(new windowObj.Event('DOMContentLoaded'));
   }
 
+  const toggleButton = windowObj.document?.querySelector('#tmToggle');
+  if (toggleButton && typeof toggleButton.dispatchEvent === 'function' && typeof windowObj.Event === 'function') {
+    toggleButton.dispatchEvent(new windowObj.Event('click', { bubbles: true }));
+  }
+
   t.after(() => {
     if (typeof dom?.window?.close === 'function') {
       dom.window.close();
     }
   });
 
-  const anyCall = Array.from(called.values()).some((count) => count > 0);
-  assert.ok(anyCall, 'Se esperaba que al menos un stub de GM_* fuese invocado');
+  const gmMethods = ['GM_getValue', 'GM_setValue', 'GM_addStyle', 'GM_registerMenuCommand'];
+  for (const name of gmMethods) {
+    const calls = called.get(name) ?? 0;
+    assert.ok(calls > 0, `Se esperaba que ${name} fuese invocado al menos una vez`);
+  }
 });
