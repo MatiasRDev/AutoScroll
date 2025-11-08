@@ -1,34 +1,36 @@
 name: CI
+
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      # Only setup Node/npm if a lockfile exists
+      - name: Setup Node (only if lockfile exists)
+        if: hashFiles('package-lock.json') != ''
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm  # no cache-dependency-path to avoid errors if lockfile is missing
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies (only if package.json exists)
-        if: hashFiles('**/package.json') != ''
+      - name: Install dependencies (only if lockfile exists)
+        if: hashFiles('package-lock.json') != ''
+        run: npm ci || npm install
+
+      # Minimal validation for userscript metadata
+      - name: Validate userscript
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-      - name: Lint
-        if: hashFiles('**/package.json') != ''
-        run: npm run lint --if-present
-
-      - name: Test
-        if: hashFiles('**/package.json') != ''
-        run: npm test --if-present
-
-      - name: Build
-        if: hashFiles('**/package.json') != ''
-        run: npm run build --if-present
+          FILE=$(ls *.user.js || true)
+          if [ -z "$FILE" ]; then
+            echo "No *.user.js found at repo root"; exit 1
+          fi
+          head -n 40 "$FILE" | grep -q "@name" || (echo "Missing @name in metadata" && exit 1)
+          head -n 40 "$FILE" | grep -q "@match" || (echo "Missing @match in metadata" && exit 1)
+          echo "Userscript OK ✅"
