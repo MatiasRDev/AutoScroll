@@ -971,7 +971,7 @@
   on(elPanelHotkey,'blur',()=>elPanelHotkey.value=panelToggleHotkey);
   on(elPanelHotkey,'keydown',(e)=>{ e.preventDefault(); const sig=toKeySig(e); if(!sig) return; panelToggleHotkey=sig; elPanelHotkey.value=panelToggleHotkey; S('panelToggleHotkey',panelToggleHotkey); });
 
-  on(elQuickStep,'change',e=>{ quickStepAddPx=clamp(parseInt(e.target.value)||20,1,1000); S('quickStepAddPx',quickStepAddPx); });
+  on(elQuickStep,'change',e=>{ quickStepAddPx=clamp(parseInt(e.target.value)||20,1,1000); S('quickStepAddPx',quickStepAddPx); if(useSiteProfile) saveProfilePartial({quickStepAddPx}); });
   on(btnMinus,'click',()=>{ speedPxPerSec=Math.max(1,Math.round(speedPxPerSec-quickStepAddPx)); elSpeed.value=String(speedPxPerSec); elSpeed.dispatchEvent(new Event('change')); elSpeedVal.textContent=String(speedPxPerSec); });
   on(btnPlus,'click',()=>{ speedPxPerSec=Math.min(10000,Math.round(speedPxPerSec+quickStepAddPx)); elSpeed.value=String(speedPxPerSec); elSpeed.dispatchEvent(new Event('change')); elSpeedVal.textContent=String(speedPxPerSec); });
   on(btnInvert,'click',()=>{ invertDirection=!invertDirection; S('invertDirection',invertDirection); });
@@ -1212,6 +1212,7 @@
   function saveProfileAll(){
     const P=getProfiles(); P[HOST]={
       speedPxPerSec, hotkey:hotkeyStr, panelToggleHotkey,
+      quickStepAddPx,
       clickToggleEnabled, clickToggleCount, clickToggleWindowMs,
       tripleClickAction, tripleClickWindowMs,
       useEdgeStrip, edgeSide, edgeHeightPx, edgeTopPct, edgeWidthPx, edgeHoverWidthPx, edgeHoverRangePx, edgeAutoHideSec,
@@ -1235,6 +1236,7 @@
       speedPxPerSec: G('speedPxPerSec'),
       hotkey: G('hotkey'),
       panelToggleHotkey: G('panelToggleHotkey'),
+      quickStepAddPx: G('quickStepAddPx'),
       clickToggleEnabled: G('clickToggleEnabled'),
       clickToggleCount: G('clickToggleCount'),
       clickToggleWindowMs: G('clickToggleWindowMs'),
@@ -1259,6 +1261,7 @@
       speedPxPerSec: DEFAULTS.speedPxPerSec,
       hotkey: DEFAULTS.hotkey,
       panelToggleHotkey: DEFAULTS.panelToggleHotkey ?? 'Shift+H',
+      quickStepAddPx: DEFAULTS.quickStepAddPx,
       clickToggleEnabled: DEFAULTS.clickToggleEnabled,
       clickToggleCount: DEFAULTS.clickToggleCount,
       clickToggleWindowMs: DEFAULTS.clickToggleWindowMs,
@@ -1300,6 +1303,7 @@
     if('speedPxPerSec' in p) speedPxPerSec=p.speedPxPerSec;
     if('hotkey' in p) hotkeyStr=p.hotkey;
     if('panelToggleHotkey' in p) panelToggleHotkey=p.panelToggleHotkey;
+    if('quickStepAddPx' in p) quickStepAddPx=p.quickStepAddPx;
     if('clickToggleEnabled' in p) clickToggleEnabled=p.clickToggleEnabled;
     if('clickToggleCount' in p) clickToggleCount=p.clickToggleCount;
     if('clickToggleWindowMs' in p) clickToggleWindowMs=p.clickToggleWindowMs;
@@ -1416,6 +1420,7 @@
     return {
       globals: {
         speedPxPerSec, hotkeyStr, panelToggleHotkey,
+        quickStepAddPx,
         useEdgeStrip, edgeSide, edgeHeightPx, edgeTopPct, edgeWidthPx, edgeHoverWidthPx, edgeHoverRangePx, edgeAutoHideSec,
         infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel,
         smart: { smartPauseEnabled, smartPause_wheel, smartPause_keys, smartPause_select, smartPause_focusInput, smartResumeMs, smartNoResumeIfInputFocused },
@@ -1429,6 +1434,7 @@
     };
   }
   const CONFIG_SETTERS = {
+    quickStepAddPx: (value)=>{ quickStepAddPx=value; S('quickStepAddPx', value); },
     edgeSide: (value)=>{ edgeSide=value; S('edgeSide', value); },
     edgeHeightPx: (value)=>{ edgeHeightPx=value; S('edgeHeightPx', value); },
     edgeTopPct: (value)=>{ edgeTopPct=value; S('edgeTopPct', value); },
@@ -1486,6 +1492,7 @@
       if('panelToggleHotkey' in g){ panelToggleHotkey=g.panelToggleHotkey; S('panelToggleHotkey',panelToggleHotkey); }
       if('useEdgeStrip' in g){ useEdgeStrip=g.useEdgeStrip; S('useEdgeStrip',useEdgeStrip); }
 
+      applyConfigValues({ quickStepAddPx:g.quickStepAddPx });
       applyConfigValues({
         edgeSide:g.edgeSide, edgeHeightPx:g.edgeHeightPx, edgeTopPct:g.edgeTopPct,
         edgeWidthPx:g.edgeWidthPx, edgeHoverWidthPx:g.edgeHoverWidthPx, edgeHoverRangePx:g.edgeHoverRangePx, edgeAutoHideSec:g.edgeAutoHideSec
