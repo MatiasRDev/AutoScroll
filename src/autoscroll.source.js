@@ -1566,7 +1566,7 @@
     if(clickTimes.length>=clickToggleCount){ clickTimes=[]; toggleRun(); e.preventDefault(); }
   }, true);
 
-  /* ------------------------ Pausa inteligente (sin clic de mouse) ------------------------ */
+  /* ------------------------ Pausa inteligente (rueda, teclas de lectura, selección y foco en inputs) ------------------------ */
   const readingKeys = new Set(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' ']);
   on(window,'wheel',e=>{ if(!smartPauseEnabled || !smartPause_wheel) return; if(running){ toggleRun(false); scheduleResume(); } }, {passive:true});
   on(window,'keydown',e=>{
