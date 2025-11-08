@@ -1428,25 +1428,73 @@
       profiles: getProfiles()
     };
   }
+  const CONFIG_SETTERS = {
+    edgeSide: (value)=>{ edgeSide=value; S('edgeSide', value); },
+    edgeHeightPx: (value)=>{ edgeHeightPx=value; S('edgeHeightPx', value); },
+    edgeTopPct: (value)=>{ edgeTopPct=value; S('edgeTopPct', value); },
+    edgeWidthPx: (value)=>{ edgeWidthPx=value; S('edgeWidthPx', value); },
+    edgeHoverWidthPx: (value)=>{ edgeHoverWidthPx=value; S('edgeHoverWidthPx', value); },
+    edgeHoverRangePx: (value)=>{ edgeHoverRangePx=value; S('edgeHoverRangePx', value); },
+    edgeAutoHideSec: (value)=>{ edgeAutoHideSec=value; S('edgeAutoHideSec', value); },
+    infScrollEnabled: (value)=>{ infScrollEnabled=value; S('infScrollEnabled', value); },
+    infScrollSentinelPx: (value)=>{ infScrollSentinelPx=value; S('infScrollSentinelPx', value); },
+    infScrollTimeoutMs: (value)=>{ infScrollTimeoutMs=value; S('infScrollTimeoutMs', value); },
+    infScrollLoaderSel: (value)=>{ infScrollLoaderSel=value; S('infScrollLoaderSel', value); },
+    smartPauseEnabled: (value)=>{ smartPauseEnabled=value; S('smartPauseEnabled', value); },
+    smartPause_wheel: (value)=>{ smartPause_wheel=value; S('smartPause_wheel', value); },
+    smartPause_keys: (value)=>{ smartPause_keys=value; S('smartPause_keys', value); },
+    smartPause_select: (value)=>{ smartPause_select=value; S('smartPause_select', value); },
+    smartPause_focusInput: (value)=>{ smartPause_focusInput=value; S('smartPause_focusInput', value); },
+    smartResumeMs: (value)=>{ smartResumeMs=value; S('smartResumeMs', value); },
+    smartNoResumeIfInputFocused: (value)=>{ smartNoResumeIfInputFocused=value; S('smartNoResumeIfInputFocused', value); },
+    rampStartMs: (value)=>{ rampStartMs=value; S('rampStartMs', value); },
+    rampStopMs: (value)=>{ rampStopMs=value; S('rampStopMs', value); },
+    boostShiftMul: (value)=>{ boostShiftMul=value; S('boostShiftMul', value); },
+    boostCtrlMul: (value)=>{ boostCtrlMul=value; S('boostCtrlMul', value); },
+    boostAllowCombine: (value)=>{ boostAllowCombine=value; S('boostAllowCombine', value); },
+    invertDirection: (value)=>{ invertDirection=value; S('invertDirection', value); },
+    theme: (value)=>{ theme=value; S('theme', value); },
+    panelOpacity: (value)=>{ panelOpacity=value; S('panelOpacity', value); },
+    a11yEnabled: (value)=>{ a11yEnabled=value; S('a11yEnabled', value); },
+    fontScalePct: (value)=>{ fontScalePct=value; S('fontScalePct', value); },
+    borderRadiusPx: (value)=>{ borderRadiusPx=value; S('borderRadiusPx', value); },
+    compactUI: (value)=>{ compactUI=value; S('compactUI', value); },
+    panelWidthPx: (value)=>{ panelWidthPx=value; S('panelWidthPx', value); },
+    shadowAlpha: (value)=>{ shadowAlpha=value; S('shadowAlpha', value); },
+    accent: (value)=>{ accent=value; S('accent', value); },
+    forceSubdomain: (value)=>{ forceSubdomain=value; S('forceSubdomain', value); },
+    forceSubdomainNoPromptHosts: (value)=>{ forceSubdomainNoPromptHosts=value; S('forceSubdomainNoPromptHosts', value); },
+    forceSubdomainDefaultAction: (value)=>{ forceSubdomainDefaultAction=value; S('forceSubdomainDefaultAction', value); },
+    usePslLite: (value)=>{ usePslLite=value; S('usePslLite', value); },
+    baseDomainOverrides: (value)=>{ baseDomainOverrides=value; S('baseDomainOverrides', value); }
+  };
+
+  function applyConfigValues(entries){
+    for(const [key, value] of Object.entries(entries || {})){
+      if(value === undefined) continue;
+      const setter = CONFIG_SETTERS[key];
+      if(typeof setter === 'function') setter(value);
+    }
+  }
+
   function importConfig(data){
     try{
       const g=data.globals||{};
-      const assign = (obj)=>{ for(const k of Object.keys(obj||{})) { S(k,obj[k]); eval(`${k}=obj.${k}`); } };
 
       if('speedPxPerSec' in g){ speedPxPerSec=g.speedPxPerSec; S('speedPxPerSec',speedPxPerSec); }
       if('hotkeyStr' in g){ hotkeyStr=g.hotkeyStr; S('hotkey',hotkeyStr); }
       if('panelToggleHotkey' in g){ panelToggleHotkey=g.panelToggleHotkey; S('panelToggleHotkey',panelToggleHotkey); }
       if('useEdgeStrip' in g){ useEdgeStrip=g.useEdgeStrip; S('useEdgeStrip',useEdgeStrip); }
 
-      assign({
+      applyConfigValues({
         edgeSide:g.edgeSide, edgeHeightPx:g.edgeHeightPx, edgeTopPct:g.edgeTopPct,
         edgeWidthPx:g.edgeWidthPx, edgeHoverWidthPx:g.edgeHoverWidthPx, edgeHoverRangePx:g.edgeHoverRangePx, edgeAutoHideSec:g.edgeAutoHideSec
       });
-      assign({ infScrollEnabled:g.infScrollEnabled, infScrollSentinelPx:g.infScrollSentinelPx, infScrollTimeoutMs:g.infScrollTimeoutMs, infScrollLoaderSel:g.infScrollLoaderSel });
+      applyConfigValues({ infScrollEnabled:g.infScrollEnabled, infScrollSentinelPx:g.infScrollSentinelPx, infScrollTimeoutMs:g.infScrollTimeoutMs, infScrollLoaderSel:g.infScrollLoaderSel });
 
-      if(g.smart){ assign(g.smart); }
-      if(g.curves){ assign(g.curves); }
-      if(g.ui){ assign(g.ui);
+      if(g.smart){ applyConfigValues(g.smart); }
+      if(g.curves){ applyConfigValues(g.curves); }
+      if(g.ui){ applyConfigValues(g.ui);
         panel.style.opacity=String(panelOpacity);
         panel.style.fontSize=`${13*fontScalePct/100}px`;
         panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`);
@@ -1458,8 +1506,8 @@
       }
       if(Array.isArray(g.rules)) { rules=g.rules; S('rules',rules); renderRules(); }
       if('rulesAutoStart' in g){ rulesAutoStart=g.rulesAutoStart; S('rulesAutoStart',rulesAutoStart); panel.querySelector('#tmRulesAutoStart').checked=rulesAutoStart; }
-      if(g.profilesConfig){ assign(g.profilesConfig); if(elForceSub) elForceSub.checked=!!forceSubdomain; if(elForceDefault) elForceDefault.value=forceSubdomainDefaultAction; }
-      if(g.psl){ assign(g.psl); if(elUsePslLite) elUsePslLite.checked=usePslLite; }
+      if(g.profilesConfig){ applyConfigValues(g.profilesConfig); if(elForceSub) elForceSub.checked=!!forceSubdomain; if(elForceDefault) elForceDefault.value=forceSubdomainDefaultAction; }
+      if(g.psl){ applyConfigValues(g.psl); if(elUsePslLite) elUsePslLite.checked=usePslLite; }
 
       if(data.profiles) setProfiles(data.profiles);
       recomputeBaseAndRefresh();
