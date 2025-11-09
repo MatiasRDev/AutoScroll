@@ -12,38 +12,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Detecta si hay lockfile en la raíz
-      - name: Detect lockfile
-        id: lock
+      - name: Detect Node project
+        id: has_node
+        shell: bash
         run: |
-          if [[ -f package-lock.json || -f npm-shrinkwrap.json || -f yarn.lock ]]; then
-            echo "found=true" >> $GITHUB_OUTPUT
+          if [ -f package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
           else
-            echo "found=false" >> $GITHUB_OUTPUT
+            echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Configura Node SOLO si hay lockfile
-      - name: Setup Node
-        if: steps.lock.outputs.found == 'true'
+      - name: Set up Node
+        if: steps.has_node.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # No usar cache-dependency-path cuando no estamos seguros del lockfile
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      # Instala deps SOLO si hay lockfile
-      - name: Install deps (only if lockfile)
-        if: steps.lock.outputs.found == 'true'
-        run: |
-          if [[ -f package-lock.json || -f npm-shrinkwrap.json ]]; then
-            npm ci || npm install
-          elif [[ -f yarn.lock ]]; then
-            corepack enable
-            yarn install --frozen-lockfile || yarn install
-          fi
+      - name: Install deps (if Node)
+        if: steps.has_node.outputs.present == 'true'
+        run: npm ci || npm install
 
-      # Resto de pasos de tu pipeline (lint/build/release), si los tienes:
-      # - name: Build
-      #   run: echo "No build needed for userscript"
+      - name: Run tests (if Node and tests exist)
+        if: steps.has_node.outputs.present == 'true' && hashFiles('tests/**/*','test/**/*','**/*.test.*') != ''
+        run: npm test
 
       - name: Finish
         run: echo "CI finished"
