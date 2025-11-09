@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 
 const RAW_BASE = 'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main';
 const HEADER_FIELDS = [
@@ -17,11 +16,9 @@ test('los metadatos usan la URL RAW esperada', async () => {
   for (const [tag, suffix] of HEADER_FIELDS) {
     const pattern = new RegExp(`^//\\s+${tag}\\s+(\\S+)`, 'm');
     const match = header.match(pattern);
-    assert.ok(match, `No se encontró la línea ${tag}`);
-    assert.strictEqual(
-      match[1],
-      `${RAW_BASE}${suffix}`,
-      `La URL de ${tag} no coincide con la base RAW esperada`
+    expect(match, `No se encontró la línea ${tag}`).toBeTruthy();
+    expect(match?.[1], `La URL de ${tag} no coincide con la base RAW esperada`).toBe(
+      `${RAW_BASE}${suffix}`
     );
   }
 });

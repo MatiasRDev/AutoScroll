@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 
 async function loadJSDOM() {
   try {
@@ -16,7 +15,7 @@ async function loadJSDOM() {
   }
 }
 
-test('el bundle invoca las APIs GM al inicializar', async (t) => {
+test('el bundle invoca las APIs GM al inicializar', async () => {
   const JSDOM = await loadJSDOM();
   const code = await readFile(new URL('../dist/autoscroll.bundle.js', import.meta.url), 'utf8');
   const sanitizedCode = code.replace(/\/\(g/g, '/g');
@@ -93,28 +92,28 @@ test('el bundle invoca las APIs GM al inicializar', async (t) => {
     ensureMethod(windowObj.document, 'addEventListener', windowObj.document.addEventListener ?? (() => {}));
   }
 
-  const context = vm.createContext(vmContext);
-  vm.runInContext(sanitizedCode, context, { filename: 'autoscroll.bundle.js' });
+  try {
+    const context = vm.createContext(vmContext);
+    vm.runInContext(sanitizedCode, context, { filename: 'autoscroll.bundle.js' });
 
-  const doc = windowObj.document;
-  if (doc && typeof doc.dispatchEvent === 'function' && typeof windowObj.Event === 'function') {
-    doc.dispatchEvent(new windowObj.Event('DOMContentLoaded'));
-  }
+    const doc = windowObj.document;
+    if (doc && typeof doc.dispatchEvent === 'function' && typeof windowObj.Event === 'function') {
+      doc.dispatchEvent(new windowObj.Event('DOMContentLoaded'));
+    }
 
-  const toggleButton = windowObj.document?.querySelector('#tmToggle');
-  if (toggleButton && typeof toggleButton.dispatchEvent === 'function' && typeof windowObj.Event === 'function') {
-    toggleButton.dispatchEvent(new windowObj.Event('click', { bubbles: true }));
-  }
+    const toggleButton = windowObj.document?.querySelector('#tmToggle');
+    if (toggleButton && typeof toggleButton.dispatchEvent === 'function' && typeof windowObj.Event === 'function') {
+      toggleButton.dispatchEvent(new windowObj.Event('click', { bubbles: true }));
+    }
 
-  t.after(() => {
+    const gmMethods = ['GM_getValue', 'GM_setValue', 'GM_addStyle', 'GM_registerMenuCommand'];
+    for (const name of gmMethods) {
+      const calls = called.get(name) ?? 0;
+      expect(calls, `Se esperaba que ${name} fuese invocado al menos una vez`).toBeGreaterThan(0);
+    }
+  } finally {
     if (typeof dom?.window?.close === 'function') {
       dom.window.close();
     }
-  });
-
-  const gmMethods = ['GM_getValue', 'GM_setValue', 'GM_addStyle', 'GM_registerMenuCommand'];
-  for (const name of gmMethods) {
-    const calls = called.get(name) ?? 0;
-    assert.ok(calls > 0, `Se esperaba que ${name} fuese invocado al menos una vez`);
   }
 });
