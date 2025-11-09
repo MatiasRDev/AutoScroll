@@ -12,6 +12,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Detecta si es proyecto Node
       - name: Detect Node project
         id: has_node
         shell: bash
@@ -22,17 +23,51 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Set up Node
+      # Detecta lockfile (npm/yarn) si hay package.json
+      - name: Detect lockfile
+        id: lock
         if: steps.has_node.outputs.present == 'true'
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "manager=npm" >> "$GITHUB_OUTPUT"
+            echo "lock_path=package-lock.json" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then
+            echo "manager=yarn" >> "$GITHUB_OUTPUT"
+            echo "lock_path=yarn.lock" >> "$GITHUB_OUTPUT"
+          else
+            echo "manager=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Setup con cache si hay lockfile
+      - name: Set up Node (cached)
+        if: steps.lock.outputs.manager != 'none'
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: ${{ steps.lock.outputs.manager }}
+          cache-dependency-path: ${{ steps.lock.outputs.lock_path }}
 
+      # Setup sin cache si NO hay lockfile
+      - name: Set up Node (no cache)
+        if: steps.has_node.outputs.present == 'true' && steps.lock.outputs.manager == 'none'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Instalación que respeta el lockfile si existe
       - name: Install deps (if Node)
         if: steps.has_node.outputs.present == 'true'
-        run: npm ci || npm install
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci || npm install
+          elif [ -f yarn.lock ]; then
+            yarn install --frozen-lockfile || yarn install
+          else
+            echo "No lockfile found. Running npm install (non-reproducible)."
+            npm install
+          fi
 
       - name: Run tests (if Node and tests exist)
         if: steps.has_node.outputs.present == 'true' && hashFiles('tests/**/*','test/**/*','**/*.test.*') != ''
