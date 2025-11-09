@@ -25,10 +25,18 @@ function createInstaller(version) {
     `// @namespace    https://matias.ramirez/autoscroll\n` +
     `// @version      ${version}\n` +
     `// @description  Auto-scroll configurable con panel avanzado\n` +
+    `// @author       Matías Ramírez\n` +
+    `// @license      MIT\n` +
     `// @match        http*://*/*\n` +
+    `// @exclude      https://chrome.google.com/webstore/*\n` +
+    `// @exclude      https://addons.mozilla.org/*\n` +
+    `// @homepageURL  https://github.com/MatiasRDev/AutoScroll\n` +
     `// @updateURL    ${INSTALLER_URL}\n` +
     `// @downloadURL  ${INSTALLER_URL}\n` +
+    `// @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cmVjdCBmaWxsPSIjMDA2ZDc3IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIvPjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik02NCAyMGwyMiAyMkg3NHY0NGgxMkw2NCAxMDggNDIgODZoMTJWNDJINDJ6Ii8+PC9zdmc+\n` +
     `// @require      ${BUNDLE_REQUIRE_URL}\n` +
+    `// @run-at       document-end\n` +
+    `// @noframes\n` +
     `// @grant        GM_getValue\n` +
     `// @grant        GM_setValue\n` +
     `// @grant        GM_addStyle\n` +
