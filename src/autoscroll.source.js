@@ -943,8 +943,20 @@
   function toggleRun(state=!running){
     running = state; S('running',running);
     lastT=null;
-    if(running){ startRampT = rampStartMs>0?performance.now():null; cancelAnimationFrame(rafId); rafId=requestAnimationFrame(step); clearTimeout(resumeTimer); waitingSentinel=false; }
-    else { cancelAnimationFrame(rafId); rafId=null; startRampT=null; }
+    if(running){
+      startRampT = rampStartMs>0?performance.now():null;
+      cancelAnimationFrame(rafId);
+      rafId=requestAnimationFrame(step);
+      clearTimeout(resumeTimer);
+      waitingSentinel=false;
+      if(infScrollEnabled && !infStop) setupInfScroll();
+    }
+    else {
+      cancelAnimationFrame(rafId);
+      rafId=null;
+      startRampT=null;
+      teardownInfScroll();
+    }
     setStateVisual();
   }
   setStateVisual(); // estado inicial
@@ -1022,7 +1034,19 @@
   on(elBoostCombine,'change',e=>{ boostAllowCombine=!!e.target.checked; S('boostAllowCombine',boostAllowCombine); });
 
   // Infinite scroll (inputs)
-  on(elInfEnabled,'change',e=>{ infScrollEnabled=!!e.target.checked; S('infScrollEnabled',infScrollEnabled); });
+  on(elInfEnabled,'change',e=>{
+    infScrollEnabled=!!e.target.checked;
+    S('infScrollEnabled',infScrollEnabled);
+    infFailuresCount=0;
+    if(!infScrollEnabled){
+      infStop=false;
+      teardownInfScroll();
+    } else {
+      infStop=false;
+      waitingSentinel=false;
+      if(running) setupInfScroll();
+    }
+  });
   on(elInfPx,'change',e=>{ infScrollSentinelPx=clamp(parseInt(e.target.value)||1200,200,4000); S('infScrollSentinelPx',infScrollSentinelPx); });
   on(elInfTimeout,'change',e=>{ infScrollTimeoutMs=clamp(parseInt(e.target.value)||4000,500,15000); S('infScrollTimeoutMs',infScrollTimeoutMs); });
   on(elInfLoader,'change',e=>{ infScrollLoaderSel=e.target.value||''; S('infScrollLoaderSel',infScrollLoaderSel); });
@@ -1075,11 +1099,30 @@
 
   /* ------------------------ Reglas ------------------------ */
   function renderRules(){
-    const el = elRuleList; el.innerHTML='';
+    const el = elRuleList;
+    el.textContent='';
     rules.forEach((r,i)=>{
-      const row=document.createElement('div'); row.className='tm-as-inline';
-      row.innerHTML=`<span class="tm-as-label">#${i+1} <b>${r.type.toUpperCase()}</b></span><code style="font-size:12px">${r.pattern}</code> <button class="tm-as-btn" data-i="${i}">Eliminar</button>`;
-      on(row.querySelector('button'),'click',()=>{ rules.splice(i,1); S('rules',rules); renderRules(); });
+      const row=document.createElement('div');
+      row.className='tm-as-inline';
+
+      const label=document.createElement('span');
+      label.className='tm-as-label';
+      label.append(`#${i+1} `);
+      const strong=document.createElement('strong');
+      strong.textContent=r.type.toUpperCase();
+      label.append(strong);
+
+      const code=document.createElement('code');
+      code.style.fontSize='12px';
+      code.textContent=r.pattern;
+
+      const btn=document.createElement('button');
+      btn.className='tm-as-btn';
+      btn.dataset.i=String(i);
+      btn.textContent='Eliminar';
+      on(btn,'click',()=>{ rules.splice(i,1); S('rules',rules); renderRules(); });
+
+      row.append(label, document.createTextNode(' '), code, document.createTextNode(' '), btn);
       el.appendChild(row);
     });
   }
@@ -1119,24 +1162,39 @@
 
   /* ------------------------ Infinite scroll (rework) ------------------------ */
   let sentinel=null, io=null, waitingSentinel=false;
+  let infPollTimer=null;
   let infFailuresCount=0, infStop=false; // corta después de 2 timeouts seguidos
 
   function setupInfScroll(){
-    if(!infScrollEnabled || infStop) return;
+    if(!infScrollEnabled || infStop){
+      teardownInfScroll();
+      return;
+    }
+    if(!document.body) return;
     if(!sentinel){
       sentinel=document.createElement('div');
       sentinel.id='tm-as-sentinel';
       sentinel.style.cssText='width:1px;height:1px';
       document.body.appendChild(sentinel);
     }
-    if(!io){
-      io=new IntersectionObserver(onSentinel, {
-        root:null,
-        rootMargin:`0px 0px ${infScrollSentinelPx}px 0px`,
-        threshold:0
-      });
+    if(io){
       io.observe(sentinel);
+      return;
     }
+    io=new IntersectionObserver(onSentinel, {
+      root:null,
+      rootMargin:`0px 0px ${infScrollSentinelPx}px 0px`,
+      threshold:0
+    });
+    io.observe(sentinel);
+  }
+
+  function teardownInfScroll(){
+    if(infPollTimer){ clearInterval(infPollTimer); infPollTimer=null; }
+    if(io){ io.disconnect(); io=null; }
+    if(sentinel?.isConnected) sentinel.remove();
+    sentinel=null;
+    waitingSentinel=false;
   }
 
   function onSentinel(entries){
@@ -1150,32 +1208,37 @@
     waitingSentinel=true;
     const start=performance.now();
 
-    const tick=setInterval(()=>{
+    if(infPollTimer){ clearInterval(infPollTimer); }
+    infPollTimer=setInterval(()=>{
+      if(!infScrollEnabled || infStop){
+        clearInterval(infPollTimer); infPollTimer=null; waitingSentinel=false; return;
+      }
       const grown = document.documentElement.scrollHeight > initialH + 50;
       const loader = infScrollLoaderSel ? document.querySelector(infScrollLoaderSel) : null;
       const loaderGone = infScrollLoaderSel ? !loader : null;
       const timeout = performance.now() - start > infScrollTimeoutMs;
 
       if(grown){
-        clearInterval(tick);
+        clearInterval(infPollTimer); infPollTimer=null;
         waitingSentinel=false;
         infFailuresCount = 0;          // éxito → reset
-        toggleRun(true);
+        if(infScrollEnabled && !infStop) toggleRun(true);
       } else if (loaderGone === true){
-        clearInterval(tick);
+        clearInterval(infPollTimer); infPollTimer=null;
         waitingSentinel=false;
         infFailuresCount = 0;          // loader terminó → intentar reanudar
-        toggleRun(true);
+        if(infScrollEnabled && !infStop) toggleRun(true);
       } else if (timeout){
-        clearInterval(tick);
+        clearInterval(infPollTimer); infPollTimer=null;
         waitingSentinel=false;
         infFailuresCount++;
         if(infFailuresCount >= 2){
           infStop = true;              // cortar para esta sesión
           console.warn('[AutoScroll] Infinite scroll detenido por timeout repetido.');
+          teardownInfScroll();
         }
         // si aún no cortamos, reanudar para permitir seguir leyendo lo que haya
-        toggleRun(true);
+        if(infScrollEnabled && !infStop) toggleRun(true);
       }
     }, 200);
   }
@@ -1381,16 +1444,40 @@
     if(q) keys=keys.filter(k=>k.toLowerCase().includes(q));
     if(order==='alpha') keys.sort();
     else keys.sort((a,b)=>b.length-a.length); // más específico primero
-    elProfilesList.innerHTML='';
-    if(keys.length===0){ elProfilesList.innerHTML='<span class="tm-as-label">No hay perfiles guardados.</span>'; return; }
+    elProfilesList.textContent='';
+    if(keys.length===0){
+      const empty=document.createElement('span');
+      empty.className='tm-as-label';
+      empty.textContent='No hay perfiles guardados.';
+      elProfilesList.appendChild(empty);
+      return;
+    }
     for(const k of keys){
       const row=document.createElement('div'); row.className='tm-as-inline';
       const tag = (k===HOST)?' (este host)':'';
-      row.innerHTML=`
-        <code style="font-size:12px">${k}${tag}</code>
-        <button class="tm-as-btn" data-act="apply" data-k="${k}">Aplicar aquí</button>
-        <button class="tm-as-btn" data-act="load" data-k="${k}">Cargar</button>
-        <button class="tm-as-btn warn" data-act="del" data-k="${k}">Eliminar</button>`;
+      const code=document.createElement('code');
+      code.style.fontSize='12px';
+      code.textContent=`${k}${tag}`;
+
+      const btnApply=document.createElement('button');
+      btnApply.className='tm-as-btn';
+      btnApply.dataset.act='apply';
+      btnApply.dataset.k=k;
+      btnApply.textContent='Aplicar aquí';
+
+      const btnLoad=document.createElement('button');
+      btnLoad.className='tm-as-btn';
+      btnLoad.dataset.act='load';
+      btnLoad.dataset.k=k;
+      btnLoad.textContent='Cargar';
+
+      const btnDel=document.createElement('button');
+      btnDel.className='tm-as-btn warn';
+      btnDel.dataset.act='del';
+      btnDel.dataset.k=k;
+      btnDel.textContent='Eliminar';
+
+      row.append(code, document.createTextNode(' '), btnApply, document.createTextNode(' '), btnLoad, document.createTextNode(' '), btnDel);
       elProfilesList.appendChild(row);
     }
   }
@@ -1442,7 +1529,19 @@
     edgeHoverWidthPx: (value)=>{ edgeHoverWidthPx=value; S('edgeHoverWidthPx', value); },
     edgeHoverRangePx: (value)=>{ edgeHoverRangePx=value; S('edgeHoverRangePx', value); },
     edgeAutoHideSec: (value)=>{ edgeAutoHideSec=value; S('edgeAutoHideSec', value); },
-    infScrollEnabled: (value)=>{ infScrollEnabled=value; S('infScrollEnabled', value); },
+    infScrollEnabled: (value)=>{
+      infScrollEnabled=value;
+      S('infScrollEnabled', value);
+      infFailuresCount=0;
+      if(!infScrollEnabled){
+        infStop=false;
+        teardownInfScroll();
+      } else {
+        infStop=false;
+        waitingSentinel=false;
+        if(running) setupInfScroll();
+      }
+    },
     infScrollSentinelPx: (value)=>{ infScrollSentinelPx=value; S('infScrollSentinelPx', value); },
     infScrollTimeoutMs: (value)=>{ infScrollTimeoutMs=value; S('infScrollTimeoutMs', value); },
     infScrollLoaderSel: (value)=>{ infScrollLoaderSel=value; S('infScrollLoaderSel', value); },
