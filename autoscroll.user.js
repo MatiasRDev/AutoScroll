@@ -1,13 +1,17 @@
 // ==UserScript==
 // @name         AutoScroll
 // @namespace    https://matias.ramirez/autoscroll
-// @version      1.0.0
+// @version      1.0.1
 // @description  Auto-scroll configurable con panel avanzado
 // @author       Matías Ramírez
 // @license      MIT
 // @match        http*://*/*
 // @exclude      https://chrome.google.com/webstore/*
 // @exclude      https://addons.mozilla.org/*
+// @homepageURL   https://github.com/MatiasRDev/AutoScroll
+// @supportURL    https://github.com/MatiasRDev/AutoScroll/issues
+// @updateURL     https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
+// @downloadURL   https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
 // @homepageURL  https://github.com/MatiasRDev/AutoScroll
 // @updateURL    https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
 // @downloadURL  https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js

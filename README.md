@@ -2,13 +2,11 @@
 
 Autoscroll suave con panel configurable, gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.
 
-## Install
+## Instalación
 
-Click to install/update via Tampermonkey:
-
-**https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js**
-
-[Install via Tampermonkey](https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js)
+1. Instala Tampermonkey (Chrome/Edge/Firefox).
+2. Click aquí para instalar el script:  
+   https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
 
 ## Atajos por defecto
 - Shift + A → Iniciar/Detener
