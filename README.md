@@ -4,11 +4,9 @@ Autoscroll suave con panel configurable, gestos (clics / triple clic), pausa int
 
 ## Instalación
 
-1. Instala Tampermonkey (Chrome/Edge/Firefox) o Violentmonkey.
-2. Abre el enlace directo y acepta la instalación:
-   **Instalar:** https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
-
-Tampermonkey o Violentmonkey detectan el archivo RAW automáticamente y ofrecen instalar o actualizar el script.
+1. Instala Tampermonkey (Chrome/Edge/Firefox).
+2. Click aquí para instalar el script:  
+   https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js
 
 ## Atajos por defecto
 - Shift + A → Iniciar/Detener
