@@ -1,0 +1,51 @@
+name: Userscript CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Chequeo básico del header del userscript
+      - name: Validate userscript header
+        run: |
+          test -f autoscroll.user.js
+          grep -q "// ==UserScript==" autoscroll.user.js
+          grep -q "// ==/UserScript==" autoscroll.user.js
+
+      # Sólo configurar Node si hay package.json
+      - name: Detect Node project
+        id: detect
+        run: |
+          if [ -f package.json ]; then
+            echo "node_project=true" >> $GITHUB_OUTPUT
+          else
+            echo "node_project=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node (only if Node project)
+        if: steps.detect.outputs.node_project == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps (only if Node project)
+        if: steps.detect.outputs.node_project == 'true'
+        run: |
+          # Preferimos 'npm ci', pero caemos a 'npm install' si el lock no existe
+          npm ci || npm install
+
+      # Sube el .user.js como artefacto para facilitar pruebas
+      - name: Upload userscript artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoscroll.user.js
+          path: autoscroll.user.js
