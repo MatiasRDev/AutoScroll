@@ -63,6 +63,7 @@
     theme: 'auto',
     panelOpacity: 0.85,
     fontScalePct: 100,         // 80..130
+    panelScalePct: 100,        // 50..250
     borderRadiusPx: 12,        // 8..24
     compactUI: false,
     panelWidthPx: 300,         // 260..520
@@ -218,6 +219,7 @@
   let a11yEnabled = G('a11yEnabled');
   let theme = G('theme');
   let panelOpacity = G('panelOpacity');
+  let panelScalePct = G('panelScalePct');
   let fontScalePct = G('fontScalePct');
   let borderRadiusPx = G('borderRadiusPx');
   let compactUI = G('compactUI');
@@ -263,7 +265,7 @@
     :root { --tm-bg:#151922cc; --tm-head:#1c2230; --tm-surface:#121724aa; --tm-border:#2b2f3a; --tm-sub:#9fb1c8; --tm-text:#eaeef2; --tm-badge:#313a4d; --tm-badge-b:#3f4961; --tm-ok:#25d07a; --tm-err:#ff6b6b; --tm-accent-bg:#1b6b64; --tm-accent-br:#0e514b; --tm-shadow-a:0.33;}
     .tm-light { --tm-bg:#ffffffea; --tm-head:#f0f2f6; --tm-surface:#f5f7fb; --tm-border:#d8dee9; --tm-sub:#5b677a; --tm-text:#0e1116; --tm-badge:#e7ebf2; --tm-badge-b:#cfd7e6; --tm-ok:#0a8f4a; --tm-err:#c73d3d; --tm-accent-bg:#2d6cdf; --tm-accent-br:#1848a9; }
 
-    .tm-as-panel{position:fixed;z-index:2147483647;right:16px;bottom:16px;font:13px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--tm-text);background:var(--tm-bg);border:1px solid var(--tm-border);border-radius:var(--tm-radius,12px);box-shadow:0 8px 30px rgba(0,0,0,var(--tm-shadow-a));width:var(--tm-width,300px);overflow:hidden;opacity:1}
+    .tm-as-panel{position:fixed;z-index:2147483647;right:16px;bottom:16px;font:13px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--tm-text);background:var(--tm-bg);border:1px solid var(--tm-border);border-radius:var(--tm-radius,12px);box-shadow:0 8px 30px rgba(0,0,0,var(--tm-shadow-a));width:var(--tm-width,300px);overflow:hidden;opacity:1;transform:scale(var(--tm-scale,1));transform-origin:bottom right}
     .tm-as-panel.compact .tm-as-header{padding:6px 8px}
     .tm-as-panel.compact .tm-sec-head{padding:6px 8px}
     .tm-as-panel.compact .tm-sec-body{padding:8px}
@@ -340,6 +342,8 @@
   panel.style.setProperty('--tm-radius', `${clamp(borderRadiusPx,8,24)}px`);
   panel.style.setProperty('--tm-width', `${clamp(panelWidthPx,260,520)}px`);
   panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
+  function applyPanelScale(){ panelScalePct=clamp(panelScalePct,50,250); panel.style.setProperty('--tm-scale', String(panelScalePct/100)); }
+  applyPanelScale();
   setAccent(accent);
   panel.setAttribute('role','dialog');
   panel.setAttribute('aria-label','AutoScroll');
@@ -574,6 +578,10 @@
             <label class="tm-as-label">Radio bordes (px)</label>
             <input class="tm-as-num" id="tmRadius" type="number" min="8" max="24" step="1" value="${borderRadiusPx}">
             <label class="tm-as-checkbox"><input type="checkbox" id="tmCompact" ${compactUI?'checked':''}> <span class="tm-as-label">Modo compacto</span></label>
+          </div>
+          <div class="tm-as-inline">
+            <label class="tm-as-label">Escala UI (%)</label>
+            <input class="tm-as-num" id="tmScale" type="number" min="50" max="250" step="5" value="${panelScalePct}">
           </div>
           <div class="tm-as-inline">
             <label class="tm-as-label">Ancho panel (px)</label>
@@ -830,6 +838,7 @@
   const elOpacity = panel.querySelector('#tmOpacity');
   const elA11y = panel.querySelector('#tmA11y');
   const elFontScale = panel.querySelector('#tmFontScale');
+  const elScale = panel.querySelector('#tmScale');
   const elRadius = panel.querySelector('#tmRadius');
   const elCompact = panel.querySelector('#tmCompact');
   const elWidthPx = panel.querySelector('#tmWidthPx');
@@ -1057,6 +1066,12 @@
   on(elOpacity,'change',e=>{ panelOpacity=clamp(parseFloat(e.target.value)||0.85,0.7,1); S('panelOpacity',panelOpacity); panel.style.opacity=String(panelOpacity); });
   on(elA11y,'change',e=>{ a11yEnabled=!!e.target.checked; S('a11yEnabled',a11yEnabled); });
   on(elFontScale,'change',e=>{ fontScalePct=clamp(parseInt(e.target.value)||100,80,130); S('fontScalePct',fontScalePct); panel.style.fontSize = `${13*fontScalePct/100}px`; });
+  on(elScale,'change',e=>{
+    panelScalePct=clamp(parseInt(e.target.value)||100,50,250);
+    S('panelScalePct',panelScalePct);
+    applyPanelScale();
+    elScale.value=String(panelScalePct);
+  });
   on(elRadius,'change',e=>{ borderRadiusPx=clamp(parseInt(e.target.value)||12,8,24); S('borderRadiusPx',borderRadiusPx); panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`); });
   on(elCompact,'change',e=>{ compactUI=!!e.target.checked; S('compactUI',compactUI); panel.classList.toggle('compact',compactUI); });
   on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); });
@@ -1279,7 +1294,8 @@
       clickToggleEnabled, clickToggleCount, clickToggleWindowMs,
       tripleClickAction, tripleClickWindowMs,
       useEdgeStrip, edgeSide, edgeHeightPx, edgeTopPct, edgeWidthPx, edgeHoverWidthPx, edgeHoverRangePx, edgeAutoHideSec,
-      infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel
+      infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel,
+      panelScalePct
     }; setProfiles(P); renderProfileList(); alert('Perfil guardado para este host.');
   }
   on(btnProfileSave,'click',saveProfileAll);
@@ -1293,6 +1309,8 @@
     elEdgeHeight.value=String(edgeHeightPx); elEdgeTop.value=String(edgeTopPct); elEdgeRange.value=String(edgeHoverRangePx);
     elInfEnabled.checked=!!infScrollEnabled; elInfPx.value=String(infScrollSentinelPx); elInfTimeout.value=String(infScrollTimeoutMs); elInfLoader.value=infScrollLoaderSel;
     elTripleAction.value=tripleClickAction; elTripleWindow.value=String(tripleClickWindowMs);
+    if(elScale) elScale.value=String(panelScalePct);
+    applyPanelScale();
   }
   function buildProfileFromCurrentGlobals(){
     return {
@@ -1316,7 +1334,8 @@
       infScrollEnabled: G('infScrollEnabled'),
       infScrollSentinelPx: G('infScrollSentinelPx'),
       infScrollTimeoutMs: G('infScrollTimeoutMs'),
-      infScrollLoaderSel: G('infScrollLoaderSel')
+      infScrollLoaderSel: G('infScrollLoaderSel'),
+      panelScalePct: G('panelScalePct')
     };
   }
   function buildProfileFromDefaults(){
@@ -1341,7 +1360,8 @@
       infScrollEnabled: DEFAULTS.infScrollEnabled,
       infScrollSentinelPx: DEFAULTS.infScrollSentinelPx,
       infScrollTimeoutMs: DEFAULTS.infScrollTimeoutMs,
-      infScrollLoaderSel: DEFAULTS.infScrollLoaderSel
+      infScrollLoaderSel: DEFAULTS.infScrollLoaderSel,
+      panelScalePct: DEFAULTS.panelScalePct
     };
   }
   function createSubProfile(mode){
@@ -1386,6 +1406,8 @@
     if('infScrollSentinelPx' in p) infScrollSentinelPx=p.infScrollSentinelPx;
     if('infScrollTimeoutMs' in p) infScrollTimeoutMs=p.infScrollTimeoutMs;
     if('infScrollLoaderSel' in p) infScrollLoaderSel=p.infScrollLoaderSel;
+    if('panelScalePct' in p) panelScalePct=clamp(p.panelScalePct,50,250);
+    applyPanelScale();
   }
 
   function resolveProfilesOnInit(refreshUI=false){
@@ -1512,7 +1534,7 @@
         infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel,
         smart: { smartPauseEnabled, smartPause_wheel, smartPause_keys, smartPause_select, smartPause_focusInput, smartResumeMs, smartNoResumeIfInputFocused },
         curves: { rampStartMs, rampStopMs, boostShiftMul, boostCtrlMul, boostAllowCombine, invertDirection },
-        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, borderRadiusPx, compactUI, panelWidthPx, shadowAlpha, accent },
+        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, panelScalePct, borderRadiusPx, compactUI, panelWidthPx, shadowAlpha, accent },
         rules, rulesAutoStart,
         profilesConfig: { forceSubdomain, forceSubdomainNoPromptHosts, forceSubdomainDefaultAction },
         psl: { usePslLite, baseDomainOverrides }
@@ -1562,6 +1584,7 @@
     panelOpacity: (value)=>{ panelOpacity=value; S('panelOpacity', value); },
     a11yEnabled: (value)=>{ a11yEnabled=value; S('a11yEnabled', value); },
     fontScalePct: (value)=>{ fontScalePct=value; S('fontScalePct', value); },
+    panelScalePct: (value)=>{ panelScalePct=clamp(parseInt(value)||100,50,250); S('panelScalePct', panelScalePct); applyPanelScale(); if(elScale) elScale.value=String(panelScalePct); },
     borderRadiusPx: (value)=>{ borderRadiusPx=value; S('borderRadiusPx', value); },
     compactUI: (value)=>{ compactUI=value; S('compactUI', value); },
     panelWidthPx: (value)=>{ panelWidthPx=value; S('panelWidthPx', value); },
@@ -1608,6 +1631,7 @@
         panel.classList.toggle('tm-light', theme==='light' || (theme==='auto' && matchMedia?.('(prefers-color-scheme: light)').matches));
         panel.style.setProperty('--tm-width', `${clamp(panelWidthPx,260,520)}px`);
         panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
+        applyPanelScale();
         setAccent(accent);
       }
       if(Array.isArray(g.rules)) { rules=g.rules; S('rules',rules); renderRules(); }
