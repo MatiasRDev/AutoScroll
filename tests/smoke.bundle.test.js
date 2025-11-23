@@ -1,7 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+
+vi.mock('jsdom', async () => {
+  const fake = await import('./helpers/fake-jsdom.js');
+  return { JSDOM: fake.JSDOM, Event: fake.Event, CustomEvent: fake.CustomEvent };
+});
 
 async function loadJSDOM() {
   try {

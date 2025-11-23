@@ -144,6 +144,7 @@ function createNode(tagName = 'div', ownerDocument, nodeType = 1) {
       if (prop === 'tagName') return state.tagName;
       if (prop === 'ownerDocument') return ownerDocument;
       if (prop === 'parentNode' || prop === 'parentElement') return state.parent ?? null;
+      if (prop === 'id') return state.attributes.get('id') ?? '';
       if (prop === 'children') return state.children;
       if (prop === 'childNodes') return state.children;
       if (prop === 'firstElementChild') {
@@ -206,6 +207,36 @@ function createNode(tagName = 'div', ownerDocument, nodeType = 1) {
       }
       if (prop === 'querySelector') {
         return (selector) => {
+          if (selector === 'body') {
+            return ownerDocument?.body ?? null;
+          }
+          if (selector === 'head') {
+            return ownerDocument?.head ?? null;
+          }
+          if (selector === 'html') {
+            return ownerDocument?.documentElement ?? null;
+          }
+          if (typeof selector === 'string' && selector.startsWith('#')) {
+            const targetId = selector.slice(1);
+            const findById = (node) => {
+              const currentId = node?.getAttribute?.('id') ?? node?.id;
+              if (currentId === targetId) return node;
+              for (const child of node?.children ?? []) {
+                const found = findById(child);
+                if (found) return found;
+              }
+              return null;
+            };
+            const match = findById(proxy);
+            if (!match && typeof state.innerHTML === 'string' && state.innerHTML.includes(`id="${targetId}"`)) {
+              const created = createNode('div', ownerDocument);
+              created.id = targetId;
+              created.__setParent?.(proxy);
+              state.children.push(created);
+              return created;
+            }
+            if (match) return match;
+          }
           if (!state.selectors.has(selector)) {
             const child = createNode('div', ownerDocument);
             state.selectors.set(selector, child);
@@ -215,6 +246,15 @@ function createNode(tagName = 'div', ownerDocument, nodeType = 1) {
       }
       if (prop === 'querySelectorAll') {
         return (selector) => {
+          if (selector === 'body') {
+            return makeNodeList(ownerDocument?.body ? [ownerDocument.body] : []);
+          }
+          if (selector === 'head') {
+            return makeNodeList(ownerDocument?.head ? [ownerDocument.head] : []);
+          }
+          if (selector === 'html') {
+            return makeNodeList(ownerDocument?.documentElement ? [ownerDocument.documentElement] : []);
+          }
           const node = proxy.querySelector(selector);
           return makeNodeList(node ? [node] : []);
         };
@@ -291,6 +331,10 @@ function createNode(tagName = 'div', ownerDocument, nodeType = 1) {
         state.classList = createClassList(state);
         return true;
       }
+      if (prop === 'id') {
+        state.attributes.set('id', String(value ?? ''));
+        return true;
+      }
       if (prop === 'style') {
         state.style = value;
         return true;
@@ -349,6 +393,7 @@ function createDocument(url) {
   doc.head = head;
   doc.body = body;
   doc.documentElement = html;
+  doc.styleSheets = [];
   head.__setParent(html);
   body.__setParent(html);
 
@@ -359,6 +404,26 @@ function createWindow(html, options) {
   const url = new URL(options.url ?? 'https://example.com/');
   const document = createDocument(url);
   document.innerHTML = html;
+
+  const createStorage = () => {
+    const store = new Map();
+    return {
+      getItem: (key) => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => {
+        store.set(String(key), String(value ?? ''));
+      },
+      removeItem: (key) => {
+        store.delete(String(key));
+      },
+      clear: () => {
+        store.clear();
+      },
+      key: (index) => Array.from(store.keys())[index] ?? null,
+      get length() {
+        return store.size;
+      },
+    };
+  };
 
   const win = new EventTarget();
   win.window = win;
@@ -388,6 +453,8 @@ function createWindow(html, options) {
   win.devicePixelRatio = 1;
   win.performance = globalThis.performance ?? { now: () => Date.now() };
   win.console = console;
+  win.localStorage = createStorage();
+  win.sessionStorage = createStorage();
   win.setTimeout = setTimeout;
   win.clearTimeout = clearTimeout;
   win.setInterval = setInterval;
