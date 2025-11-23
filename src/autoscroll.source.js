@@ -42,7 +42,7 @@
     // Pausa inteligente
     smartPauseEnabled: true,
     smartPause_wheel: true,
-    smartPause_keys:  true,
+    smartPause_keys: true,
     smartPause_select: true,
     smartPause_focusInput: true,
     smartResumeMs: 3000,
