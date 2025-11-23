@@ -22,7 +22,7 @@ const INSTALLER_URL =
 function createInstaller(version) {
   return `// ==UserScript==\n` +
     `// @name         AutoScroll\n` +
-    `// @namespace    https://matias.ramirez/autoscroll\n` +
+    `// @namespace    https://github.com/MatiasRDev/AutoScroll\n` +
     `// @version      ${version}\n` +
     `// @description  Auto-scroll configurable con panel avanzado\n` +
     `// @author       Matías Ramírez\n` +

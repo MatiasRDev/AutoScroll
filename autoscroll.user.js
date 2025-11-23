@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         AutoScroll
-// @namespace    https://matias.ramirez/autoscroll
+// @namespace    https://github.com/MatiasRDev/AutoScroll
 // @version      1.0.1
 // @description  Auto-scroll configurable con panel avanzado
 // @author       Matías Ramírez
