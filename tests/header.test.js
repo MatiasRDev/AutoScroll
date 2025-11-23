@@ -10,6 +10,22 @@ const HEADER_FIELDS = [
 const NAMESPACE_URL = 'https://github.com/MatiasRDev/AutoScroll';
 
 const USERSCRIPT_PATH = new URL('../autoscroll.user.js', import.meta.url);
+const PACKAGE_JSON_PATH = new URL('../package.json', import.meta.url);
+
+test('la versión del userscript coincide con package.json', async () => {
+  const [header, packageJson] = await Promise.all([
+    readFile(USERSCRIPT_PATH, 'utf8'),
+    readFile(PACKAGE_JSON_PATH, 'utf8'),
+  ]);
+
+  const versionMatch = header.match(/^\/\/\s+@version\s+(\S+)/m);
+  expect(versionMatch, 'No se encontró la línea @version').toBeTruthy();
+
+  const { version } = JSON.parse(packageJson);
+  expect(versionMatch?.[1], 'La versión del userscript no coincide con package.json').toBe(
+    version
+  );
+});
 
 test('los metadatos usan la URL RAW esperada', async () => {
   const header = await readFile(USERSCRIPT_PATH, 'utf8');
