@@ -1,6 +1,6 @@
 # AutoScroll (Userscript)
 
-Autoscroll suave con panel configurable, gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.
+Autoscroll suave con panel configurable: gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.
 
 ## Instalación
 
