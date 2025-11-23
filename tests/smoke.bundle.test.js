@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import { expect, test } from 'vitest';
 
@@ -18,7 +19,9 @@ async function loadJSDOM() {
 test('el bundle invoca las APIs GM al inicializar', async () => {
   const JSDOM = await loadJSDOM();
   const code = await readFile(new URL('../dist/autoscroll.bundle.js', import.meta.url), 'utf8');
-  const sanitizedCode = code.replace(/\/\(g/g, '/g');
+  const computeHash = (value) => createHash('sha256').update(value).digest('hex');
+  const bundleHash = computeHash(code);
+  const codeToExecute = code;
 
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
     url: 'https://example.com',
@@ -94,7 +97,9 @@ test('el bundle invoca las APIs GM al inicializar', async () => {
 
   try {
     const context = vm.createContext(vmContext);
-    vm.runInContext(sanitizedCode, context, { filename: 'autoscroll.bundle.js' });
+    vm.runInContext(codeToExecute, context, { filename: 'autoscroll.bundle.js' });
+
+    expect(computeHash(codeToExecute)).toBe(bundleHash);
 
     const doc = windowObj.document;
     if (doc && typeof doc.dispatchEvent === 'function' && typeof windowObj.Event === 'function') {
