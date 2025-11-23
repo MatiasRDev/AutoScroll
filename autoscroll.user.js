@@ -2,7 +2,7 @@
 // @name         AutoScroll
 // @namespace    https://github.com/MatiasRDev/AutoScroll
 // @version      1.0.1
-// @description  Auto-scroll configurable con panel avanzado
+// @description  Autoscroll suave con panel configurable: gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.
 // @author       Matías Ramírez
 // @license      MIT
 // @match        http*://*/*
