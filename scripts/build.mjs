@@ -24,7 +24,7 @@ function createInstaller(version) {
     `// @name         AutoScroll\n` +
     `// @namespace    https://github.com/MatiasRDev/AutoScroll\n` +
     `// @version      ${version}\n` +
-    `// @description  Auto-scroll configurable con panel avanzado\n` +
+    `// @description  Autoscroll suave con panel configurable: gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.\n` +
     `// @author       Matías Ramírez\n` +
     `// @license      MIT\n` +
     `// @match        http*://*/*\n` +
