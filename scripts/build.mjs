@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import esbuild from 'esbuild';
 import javascriptObfuscator from 'javascript-obfuscator';
+import { README_PATH, getPublicDescription } from './description.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,16 +19,13 @@ const BUNDLE_REQUIRE_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.bundle.js';
 const INSTALLER_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js';
-const SCRIPT_DESCRIPTION =
-  'AutoScroll suave con panel configurable: gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.';
-
 // Mantener sincronizada con la primera línea descriptiva de README.md.
-function createInstaller(version) {
+function createInstaller(version, description) {
   return `// ==UserScript==\n` +
     `// @name         AutoScroll\n` +
     `// @namespace    https://github.com/MatiasRDev/AutoScroll\n` +
     `// @version      ${version}\n` +
-    `// @description  ${SCRIPT_DESCRIPTION}\n` +
+    `// @description  ${description}\n` +
     `// @author       Matías Ramírez\n` +
     `// @license      MIT\n` +
     `// @match        http*://*/*\n` +
@@ -49,9 +47,10 @@ function createInstaller(version) {
 
 async function build() {
   try {
-    const [sourceCode, packageJson] = await Promise.all([
+    const [sourceCode, packageJson, scriptDescription] = await Promise.all([
       readFile(SOURCE_FILE, 'utf8'),
       readFile(PACKAGE_JSON, 'utf8'),
+      getPublicDescription(README_PATH),
     ]);
 
     if (!sourceCode.trim()) {
@@ -86,7 +85,7 @@ async function build() {
     await mkdir(DIST_DIR, { recursive: true });
     await writeFile(BUNDLE_FILE, `${obfuscationResult.getObfuscatedCode()}\n`, 'utf8');
 
-    const installer = createInstaller(version);
+    const installer = createInstaller(version, scriptDescription);
     await writeFile(INSTALLER_FILE, `${installer}\n`, 'utf8');
 
     console.log(`Bundle generado en ${path.relative(projectRoot, BUNDLE_FILE)}`);
