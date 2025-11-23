@@ -18,13 +18,16 @@ const BUNDLE_REQUIRE_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/dist/autoscroll.bundle.js';
 const INSTALLER_URL =
   'https://raw.githubusercontent.com/MatiasRDev/AutoScroll/main/autoscroll.user.js';
+const SCRIPT_DESCRIPTION =
+  'Autoscroll suave con panel configurable: gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.';
 
+// Mantener sincronizada con la primera línea descriptiva de README.md.
 function createInstaller(version) {
   return `// ==UserScript==\n` +
     `// @name         AutoScroll\n` +
     `// @namespace    https://github.com/MatiasRDev/AutoScroll\n` +
     `// @version      ${version}\n` +
-    `// @description  Autoscroll suave con panel configurable: gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.\n` +
+    `// @description  ${SCRIPT_DESCRIPTION}\n` +
     `// @author       Matías Ramírez\n` +
     `// @license      MIT\n` +
     `// @match        http*://*/*\n` +
