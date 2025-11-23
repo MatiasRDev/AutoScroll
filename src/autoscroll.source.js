@@ -260,6 +260,44 @@
   const px = (n)=>`${n}px`;
   const on = (el,ev,fn,opt)=>el.addEventListener(ev,fn,opt);
 
+  // --- Viewport clamp (evita que el panel quede fuera de pantalla) ---
+  const VIEW_MARGIN = 8; // margen mínimo interno
+
+  function clampPanelToViewport() {
+    if (!panel || !panel.isConnected || panel.style.display === 'none') return;
+    const r = panel.getBoundingClientRect();
+    let left = r.left;
+    let top  = r.top;
+
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Cuando el panel es más grande que el viewport, al menos dejamos un margen
+    const maxLeft = Math.max(VIEW_MARGIN, vw - r.width  - VIEW_MARGIN);
+    const maxTop  = Math.max(VIEW_MARGIN, vh - r.height - VIEW_MARGIN);
+
+    left = clamp(Math.round(left), VIEW_MARGIN, maxLeft);
+    top  = clamp(Math.round(top),  VIEW_MARGIN, maxTop);
+
+    // Anclamos por left/top para que el clamping sea predecible
+    panel.style.right  = 'unset';
+    panel.style.bottom = 'unset';
+    panel.style.left   = left + 'px';
+    panel.style.top    = top  + 'px';
+  }
+
+  const debounce = (fn, ms = 60) => {
+    let t;
+    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  };
+
+  // Re-clamp al cambiar tamaño de ventana o viewport visual (zoom móvil/desktop)
+  on(window, 'resize', debounce(clampPanelToViewport, 60));
+  if (window.visualViewport) {
+    on(visualViewport, 'resize', debounce(clampPanelToViewport, 60));
+    on(visualViewport, 'scroll', debounce(clampPanelToViewport, 60));
+  }
+
   /* ------------------------ CSS ------------------------ */
   GM_addStyle(`
     :root { --tm-bg:#151922cc; --tm-head:#1c2230; --tm-surface:#121724aa; --tm-border:#2b2f3a; --tm-sub:#9fb1c8; --tm-text:#eaeef2; --tm-badge:#313a4d; --tm-badge-b:#3f4961; --tm-ok:#25d07a; --tm-err:#ff6b6b; --tm-accent-bg:#1b6b64; --tm-accent-br:#0e514b; --tm-shadow-a:0.33;}
@@ -342,7 +380,7 @@
   panel.style.setProperty('--tm-radius', `${clamp(borderRadiusPx,8,24)}px`);
   panel.style.setProperty('--tm-width', `${clamp(panelWidthPx,260,520)}px`);
   panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
-  function applyPanelScale(){ panelScalePct=clamp(panelScalePct,50,250); panel.style.setProperty('--tm-scale', String(panelScalePct/100)); }
+  function applyPanelScale(){ panelScalePct=clamp(panelScalePct,50,250); panel.style.setProperty('--tm-scale', String(panelScalePct/100)); clampPanelToViewport(); }
   applyPanelScale();
   setAccent(accent);
   panel.setAttribute('role','dialog');
@@ -719,6 +757,7 @@
     <div class="tm-as-footer">Estado: <span class="tm-as-status tm-state ${running?'on':'off'}" id="tmFooter">${running?'● Desplazando…':'● Inactivo'}</span></div>
   `;
   document.documentElement.appendChild(panel);
+  clampPanelToViewport();
 
   /* ------------------------ Edge strip + sensor ------------------------ */
   let edgeStrip=null, edgeSensor=null, edgeAutoHideTimer=null;
@@ -774,10 +813,37 @@
   function hideEdge(){ if(edgeStrip) edgeStrip.style.display='none'; if(edgeSensor) edgeSensor.style.display='none'; }
 
   /* ------------------------ Panel: mover ------------------------ */
-  (()=>{ const header=panel.querySelector('.tm-as-header'); let sx=0,sy=0,x=0,y=0,drag=false;
-    on(header,'mousedown',e=>{ if(!e.target.classList.contains('tm-as-drag')) return; drag=true; sx=e.clientX; sy=e.clientY; const r=panel.getBoundingClientRect(); x=r.left; y=r.top; e.preventDefault(); });
-    on(window,'mousemove',e=>{ if(!drag) return; const nx=x+(e.clientX-sx); const ny=y+(e.clientY-sy); panel.style.right='unset'; panel.style.bottom='unset'; panel.style.left=px(nx); panel.style.top=px(ny); });
-    on(window,'mouseup',()=>drag=false);
+  (()=>{ 
+    const header = panel.querySelector('.tm-as-header');
+    let sx=0, sy=0, x=0, y=0, drag=false;
+
+    on(header,'mousedown',e=>{
+      if(!e.target.classList.contains('tm-as-drag')) return;
+      drag = true;
+      sx = e.clientX; 
+      sy = e.clientY;
+      const r = panel.getBoundingClientRect();
+      x = r.left; 
+      y = r.top;
+      e.preventDefault();
+    });
+
+    on(window,'mousemove',e=>{
+      if(!drag) return;
+      const nx = x + (e.clientX - sx);
+      const ny = y + (e.clientY - sy);
+      panel.style.right  = 'unset';
+      panel.style.bottom = 'unset';
+      panel.style.left   = px(nx);
+      panel.style.top    = px(ny);
+      clampPanelToViewport(); // asegura que no se salga mientras arrastras
+    });
+
+    on(window,'mouseup',()=>{
+      if(!drag) return;
+      drag = false;
+      clampPanelToViewport(); // por si quedó al borde, lo re-ajusta
+    });
   })();
 
   /* ------------------------ Refs ------------------------ */
@@ -879,10 +945,11 @@
     const collapsed=!sec.classList.contains('collapsed'); sec.classList.toggle('collapsed',collapsed); body.style.display=collapsed?'none':'';
     const id=sec.id; const keyMap={secBasic:'secBasicOpen',secVisibility:'secVisibilityOpen',secGestures:'secGesturesOpen',secPause:'secPauseOpen',secCurves:'secCurvesOpen',secRules:'secRulesOpen',secProfiles:'secProfilesOpen',secAppearance:'secAppearanceOpen',secTools:'secToolsOpen',secAdvanced:'secAdvancedOpen'};
     const k=keyMap[id]; if(k) S(k,!collapsed);
+    clampPanelToViewport();
   }
 
   /* ------------------------ Panel visibility API ------------------------ */
-  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); };
+  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); clampPanelToViewport(); };
   const hidePanelFull = ()=>{ panel.style.display='none'; hideEdge(); panelVisibility='hidden_full'; S('panelVisibility',panelVisibility); };
   const hidePanelEdge = ()=>{ panel.style.display='none'; showEdge(); panelVisibility='hidden_edge'; S('panelVisibility',panelVisibility); };
 
@@ -899,9 +966,11 @@
   /* ------------------------ Toggle + collapse behavior ------------------------ */
   on(elToggle,'click',()=>toggleRun());
   on(elCollapse,'click',(e)=>{
-    if(panelCollapsed || elBody.style.display==='none'){ panelCollapsed=false; S('panelCollapsed',panelCollapsed); elBody.style.display=''; elCollapse.classList.remove('collapsed'); showPanel(); hideEdge(); return; }
-    if(useEdgeStrip && !e.ctrlKey){ hidePanelEdge(); return; }
+    if(panelCollapsed || elBody.style.display==='none'){ panelCollapsed=false; S('panelCollapsed',panelCollapsed); elBody.style.display=''; elCollapse.classList.remove('collapsed'); showPanel(); hideEdge(); clampPanelToViewport(); return; }
+    clampPanelToViewport();
+    if(useEdgeStrip && !e.ctrlKey){ hidePanelEdge(); clampPanelToViewport(); return; }
     panelCollapsed=true; S('panelCollapsed',panelCollapsed); elBody.style.display='none'; elCollapse.classList.add('collapsed');
+    clampPanelToViewport();
   });
 
   /* ------------------------ Core autoscroll ------------------------ */
@@ -1065,7 +1134,7 @@
   on(elTheme,'change',e=>{ theme=e.target.value; S('theme',theme); panel.classList.toggle('tm-light', theme==='light' || (theme==='auto' && matchMedia?.('(prefers-color-scheme: light)').matches)); });
   on(elOpacity,'change',e=>{ panelOpacity=clamp(parseFloat(e.target.value)||0.85,0.7,1); S('panelOpacity',panelOpacity); panel.style.opacity=String(panelOpacity); });
   on(elA11y,'change',e=>{ a11yEnabled=!!e.target.checked; S('a11yEnabled',a11yEnabled); });
-  on(elFontScale,'change',e=>{ fontScalePct=clamp(parseInt(e.target.value)||100,80,130); S('fontScalePct',fontScalePct); panel.style.fontSize = `${13*fontScalePct/100}px`; });
+  on(elFontScale,'change',e=>{ fontScalePct=clamp(parseInt(e.target.value)||100,80,130); S('fontScalePct',fontScalePct); panel.style.fontSize = `${13*fontScalePct/100}px`; clampPanelToViewport(); });
   on(elScale,'change',e=>{
     panelScalePct=clamp(parseInt(e.target.value)||100,50,250);
     S('panelScalePct',panelScalePct);
@@ -1074,7 +1143,7 @@
   });
   on(elRadius,'change',e=>{ borderRadiusPx=clamp(parseInt(e.target.value)||12,8,24); S('borderRadiusPx',borderRadiusPx); panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`); });
   on(elCompact,'change',e=>{ compactUI=!!e.target.checked; S('compactUI',compactUI); panel.classList.toggle('compact',compactUI); });
-  on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); });
+  on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); clampPanelToViewport(); });
   on(elShadow,'change',e=>{ shadowAlpha=clamp(parseFloat(e.target.value)||0.33,0,0.6); S('shadowAlpha',shadowAlpha); panel.style.setProperty('--tm-shadow-a', String(shadowAlpha)); });
   on(elAccent,'change',e=>{ accent=e.target.value; S('accent',accent); setAccent(accent); });
 
@@ -1633,6 +1702,7 @@
         panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
         applyPanelScale();
         setAccent(accent);
+        clampPanelToViewport();
       }
       if(Array.isArray(g.rules)) { rules=g.rules; S('rules',rules); renderRules(); }
       if('rulesAutoStart' in g){ rulesAutoStart=g.rulesAutoStart; S('rulesAutoStart',rulesAutoStart); panel.querySelector('#tmRulesAutoStart').checked=rulesAutoStart; }
