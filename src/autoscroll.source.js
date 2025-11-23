@@ -199,6 +199,7 @@
   let infScrollSentinelPx = G('infScrollSentinelPx');
   let infScrollTimeoutMs = G('infScrollTimeoutMs');
   let infScrollLoaderSel = G('infScrollLoaderSel');
+  let infFailuresCount=0, infStop=false, infStopMsg=''; // corta después de 2 timeouts seguidos
 
   let smartPauseEnabled = G('smartPauseEnabled');
   let smartPause_wheel = G('smartPause_wheel');
@@ -1259,7 +1260,6 @@
   /* ------------------------ Infinite scroll (rework) ------------------------ */
   let sentinel=null, io=null, waitingSentinel=false;
   let infPollTimer=null;
-  let infFailuresCount=0, infStop=false, infStopMsg=''; // corta después de 2 timeouts seguidos
 
   function resetInfStop(){
     infStop=false;
