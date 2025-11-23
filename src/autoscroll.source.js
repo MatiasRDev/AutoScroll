@@ -13,6 +13,7 @@
     clickToggleEnabled: false,
     clickToggleCount: 2,
     clickToggleWindowMs: 500,
+    middlePause: true,
 
     // Triple-clic
     tripleClickAction: 'none', // none|top|bottom|toggleDir
@@ -177,6 +178,7 @@
   let clickToggleEnabled = G('clickToggleEnabled');
   let clickToggleCount = G('clickToggleCount');
   let clickToggleWindowMs = G('clickToggleWindowMs');
+  let middlePause = G('middlePause');
 
   let tripleClickAction = G('tripleClickAction') || 'none';
   let tripleClickWindowMs = G('tripleClickWindowMs');
@@ -506,7 +508,7 @@
             <input class="tm-as-num" id="tmClickWindow" type="number" min="100" max="3000" step="50" value="${clickToggleWindowMs}">
           </div>
           <div class="tm-as-inline">
-            <label class="tm-as-checkbox"><input type="checkbox" id="tmMiddlePause" checked> <span class="tm-as-label">Clic medio: pausar/reanudar</span></label>
+            <label class="tm-as-checkbox"><input type="checkbox" id="tmMiddlePause" ${middlePause?'checked':''}> <span class="tm-as-label">Clic medio: pausar/reanudar</span></label>
           </div>
           <div class="tm-as-inline">
             <label class="tm-as-label">Triple-clic (acción)</label>
@@ -1082,7 +1084,8 @@
   on(elClickEnabled,'change',e=>{ clickToggleEnabled=!!e.target.checked; S('clickToggleEnabled',clickToggleEnabled); });
   on(elClickCount,'change',e=>{ clickToggleCount=clamp(parseInt(e.target.value)||2,1,6); S('clickToggleCount',clickToggleCount); });
   on(elClickWindow,'change',e=>{ clickToggleWindowMs=clamp(parseInt(e.target.value)||500,100,3000); S('clickToggleWindowMs',clickToggleWindowMs); });
-  let middlePause=true; on(elMiddlePause,'change',e=>{ middlePause=!!e.target.checked; });
+  elMiddlePause.checked=middlePause;
+  on(elMiddlePause,'change',e=>{ middlePause=!!e.target.checked; S('middlePause', middlePause); });
   on(elTripleAction,'change',e=>{ tripleClickAction=e.target.value; S('tripleClickAction',tripleClickAction); });
   on(elTripleWindow,'change',e=>{ tripleClickWindowMs=clamp(parseInt(e.target.value)||500,200,1500); S('tripleClickWindowMs',tripleClickWindowMs); });
 
@@ -1598,7 +1601,7 @@
     return {
       globals: {
         speedPxPerSec, hotkeyStr, panelToggleHotkey,
-        quickStepAddPx,
+        quickStepAddPx, middlePause,
         useEdgeStrip, edgeSide, edgeHeightPx, edgeTopPct, edgeWidthPx, edgeHoverWidthPx, edgeHoverRangePx, edgeAutoHideSec,
         infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel,
         smart: { smartPauseEnabled, smartPause_wheel, smartPause_keys, smartPause_select, smartPause_focusInput, smartResumeMs, smartNoResumeIfInputFocused },
@@ -1613,6 +1616,7 @@
   }
   const CONFIG_SETTERS = {
     quickStepAddPx: (value)=>{ quickStepAddPx=value; S('quickStepAddPx', value); },
+    middlePause: (value)=>{ middlePause=value; S('middlePause', value); if(elMiddlePause) elMiddlePause.checked=middlePause; },
     edgeSide: (value)=>{ edgeSide=value; S('edgeSide', value); },
     edgeHeightPx: (value)=>{ edgeHeightPx=value; S('edgeHeightPx', value); },
     edgeTopPct: (value)=>{ edgeTopPct=value; S('edgeTopPct', value); },
@@ -1683,7 +1687,7 @@
       if('panelToggleHotkey' in g){ panelToggleHotkey=g.panelToggleHotkey; S('panelToggleHotkey',panelToggleHotkey); }
       if('useEdgeStrip' in g){ useEdgeStrip=g.useEdgeStrip; S('useEdgeStrip',useEdgeStrip); }
 
-      applyConfigValues({ quickStepAddPx:g.quickStepAddPx });
+      applyConfigValues({ quickStepAddPx:g.quickStepAddPx, middlePause:g.middlePause });
       applyConfigValues({
         edgeSide:g.edgeSide, edgeHeightPx:g.edgeHeightPx, edgeTopPct:g.edgeTopPct,
         edgeWidthPx:g.edgeWidthPx, edgeHoverWidthPx:g.edgeHoverWidthPx, edgeHoverRangePx:g.edgeHoverRangePx, edgeAutoHideSec:g.edgeAutoHideSec
@@ -1742,7 +1746,7 @@
 
   /* ------------------------ Gestos globales ------------------------ */
   // Clic medio: pausa/reanuda
-  on(window,'mousedown',e=>{ if(e.button===1 && elMiddlePause.checked && !isInsideUI(e.target)){ e.preventDefault(); toggleRun(!running); } }, true);
+  on(window,'mousedown',e=>{ if(e.button===1 && middlePause && !isInsideUI(e.target)){ e.preventDefault(); toggleRun(!running); } }, true);
 
   // Triple-clic
   let tripleTimes=[];
