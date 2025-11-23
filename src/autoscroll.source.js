@@ -320,6 +320,10 @@
     .tm-as-btn:hover{filter:brightness(1.06)}
     .tm-as-btn.warn{border-color:#5b3940;background:#3a2326}
     .tm-light .tm-as-btn.warn{background:#ffe7e7;border-color:#ffc5c5;color:#5a0000}
+    .tm-as-banner{padding:8px;border-radius:var(--tm-radius,12px);border:1px solid #394152;background:#232a3a;color:var(--tm-text);font-size:12px;line-height:1.4}
+    .tm-as-banner.warn{border-color:#5b3940;background:#3a2326}
+    .tm-light .tm-as-banner{background:#f6f8fa;border-color:#d1d9e6;color:#0e1116}
+    .tm-light .tm-as-banner.warn{background:#ffe7e7;border-color:#ffc5c5;color:#5a0000}
     .tm-as-collapse{transition:transform .2s ease}
     .tm-as-collapse.collapsed{transform:rotate(-90deg)}
 
@@ -439,6 +443,9 @@
             <div class="tm-as-inline">
               <label class="tm-as-label">Selector loader (opcional)</label>
               <input class="tm-as-input" id="tmInfLoader" type="text" placeholder=".spinner, #loading" value="${infScrollLoaderSel}">
+            </div>
+            <div class="tm-as-banner warn" id="tmInfStopMsg" style="${infStop?'':'display:none'}">
+              Infinite scroll se detuvo tras múltiples timeouts. Revisa si hay más contenido y vuelve a activar el toggle cuando quieras reanudar.
             </div>
           </div>
         </div>
@@ -901,6 +908,7 @@
   const elInfPx = panel.querySelector('#tmInfPx');
   const elInfTimeout = panel.querySelector('#tmInfTimeout');
   const elInfLoader = panel.querySelector('#tmInfLoader');
+  const elInfStopMsg = panel.querySelector('#tmInfStopMsg');
 
   const elTheme = panel.querySelector('#tmTheme');
   const elOpacity = panel.querySelector('#tmOpacity');
@@ -951,7 +959,7 @@
   }
 
   /* ------------------------ Panel visibility API ------------------------ */
-  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); clampPanelToViewport(); };
+  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); clampPanelToViewport(); updateInfStopNotice(); };
   const hidePanelFull = ()=>{ panel.style.display='none'; hideEdge(); panelVisibility='hidden_full'; S('panelVisibility',panelVisibility); };
   const hidePanelEdge = ()=>{ panel.style.display='none'; showEdge(); panelVisibility='hidden_edge'; S('panelVisibility',panelVisibility); };
 
@@ -1040,6 +1048,7 @@
     setStateVisual();
   }
   setStateVisual(); // estado inicial
+  updateInfStopNotice();
 
   /* ------------------------ Hotkeys globales ------------------------ */
   on(window,'keydown',(e)=>{
@@ -1120,13 +1129,13 @@
     S('infScrollEnabled',infScrollEnabled);
     infFailuresCount=0;
     if(!infScrollEnabled){
-      infStop=false;
+      resetInfStop();
       teardownInfScroll();
     } else {
-      infStop=false;
-      waitingSentinel=false;
+      resetInfStop();
       if(running) setupInfScroll();
     }
+    updateInfStopNotice();
   });
   on(elInfPx,'change',e=>{ infScrollSentinelPx=clamp(parseInt(e.target.value)||1200,200,4000); S('infScrollSentinelPx',infScrollSentinelPx); });
   on(elInfTimeout,'change',e=>{ infScrollTimeoutMs=clamp(parseInt(e.target.value)||4000,500,15000); S('infScrollTimeoutMs',infScrollTimeoutMs); });
@@ -1250,7 +1259,25 @@
   /* ------------------------ Infinite scroll (rework) ------------------------ */
   let sentinel=null, io=null, waitingSentinel=false;
   let infPollTimer=null;
-  let infFailuresCount=0, infStop=false; // corta después de 2 timeouts seguidos
+  let infFailuresCount=0, infStop=false, infStopMsg=''; // corta después de 2 timeouts seguidos
+
+  function resetInfStop(){
+    infStop=false;
+    infStopMsg='';
+    waitingSentinel=false;
+    updateInfStopNotice();
+  }
+
+  function updateInfStopNotice(){
+    if(!elInfStopMsg) return;
+    if(infStop){
+      elInfStopMsg.textContent = infStopMsg || 'Infinite scroll pausado tras timeouts. Actívalo manualmente para reanudar.';
+      elInfStopMsg.style.display='';
+    } else {
+      elInfStopMsg.style.display='none';
+    }
+    if(elInfEnabled) elInfEnabled.checked = !!infScrollEnabled;
+  }
 
   function setupInfScroll(){
     if(!infScrollEnabled || infStop){
@@ -1321,8 +1348,14 @@
         infFailuresCount++;
         if(infFailuresCount >= 2){
           infStop = true;              // cortar para esta sesión
+          infStopMsg = 'Infinite scroll se detuvo tras dos timeouts seguidos. Activa de nuevo el toggle cuando quieras reintentar.';
+          infFailuresCount = 0;
+          infScrollEnabled = false;
+          S('infScrollEnabled', infScrollEnabled);
           console.warn('[AutoScroll] Infinite scroll detenido por timeout repetido.');
           teardownInfScroll();
+          updateInfStopNotice();
+          alert('Infinite scroll se detuvo tras dos timeouts seguidos. Revisa si hay más contenido y vuelve a activarlo manualmente.');
         }
         // si aún no cortamos, reanudar para permitir seguir leyendo lo que haya
         if(infScrollEnabled && !infStop) toggleRun(true);
@@ -1629,13 +1662,13 @@
       S('infScrollEnabled', value);
       infFailuresCount=0;
       if(!infScrollEnabled){
-        infStop=false;
+        resetInfStop();
         teardownInfScroll();
       } else {
-        infStop=false;
-        waitingSentinel=false;
+        resetInfStop();
         if(running) setupInfScroll();
       }
+      updateInfStopNotice();
     },
     infScrollSentinelPx: (value)=>{ infScrollSentinelPx=value; S('infScrollSentinelPx', value); },
     infScrollTimeoutMs: (value)=>{ infScrollTimeoutMs=value; S('infScrollTimeoutMs', value); },
