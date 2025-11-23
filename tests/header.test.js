@@ -11,6 +11,7 @@ const NAMESPACE_URL = 'https://github.com/MatiasRDev/AutoScroll';
 
 const USERSCRIPT_PATH = new URL('../autoscroll.user.js', import.meta.url);
 const PACKAGE_JSON_PATH = new URL('../package.json', import.meta.url);
+const README_PATH = new URL('../README.md', import.meta.url);
 
 test('la versión del userscript coincide con package.json', async () => {
   const [header, packageJson] = await Promise.all([
@@ -48,4 +49,23 @@ test('el namespace apunta a la URL pública', async () => {
 
   expect(match, 'No se encontró la línea @namespace').toBeTruthy();
   expect(match?.[1], 'El namespace no coincide con la URL pública').toBe(NAMESPACE_URL);
+});
+
+test('la descripción coincide con la frase pública del README', async () => {
+  const [header, readme] = await Promise.all([
+    readFile(USERSCRIPT_PATH, 'utf8'),
+    readFile(README_PATH, 'utf8'),
+  ]);
+
+  const descriptionMatch = header.match(/^\/\/\s+@description\s+(.+)$/m);
+  expect(descriptionMatch, 'No se encontró la línea @description').toBeTruthy();
+
+  const readmeFeatureLine = readme
+    .split('\n')
+    .find((line) => line.trim() && !line.trim().startsWith('#'));
+
+  // Garantiza que lo que ve el usuario en Tampermonkey se mantenga alineado con la documentación pública.
+  expect(descriptionMatch?.[1].trim(), 'La descripción no coincide con README').toBe(
+    readmeFeatureLine?.trim()
+  );
 });
