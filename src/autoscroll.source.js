@@ -1647,16 +1647,47 @@
       profiles: getProfiles()
     };
   }
+  const fallbackNumber = (current, key) => Number.isFinite(current) ? current : DEFAULTS[key];
+  const normalizeNumber = (value, { parser = Number, min = -Infinity, max = Infinity, fallback }) => {
+    const parsed = parser(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    const clamped = clamp(parsed, min, max);
+    return Number.isFinite(clamped) ? clamped : fallback;
+  };
+
   const CONFIG_SETTERS = {
-    quickStepAddPx: (value)=>{ quickStepAddPx=value; S('quickStepAddPx', value); },
+    quickStepAddPx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 1, max: 1000, fallback: fallbackNumber(quickStepAddPx, 'quickStepAddPx') });
+      quickStepAddPx=next; S('quickStepAddPx', next);
+    },
     middlePause: (value)=>{ middlePause=value; S('middlePause', value); if(elMiddlePause) elMiddlePause.checked=middlePause; },
     edgeSide: (value)=>{ edgeSide=value; S('edgeSide', value); },
-    edgeHeightPx: (value)=>{ edgeHeightPx=value; S('edgeHeightPx', value); },
-    edgeTopPct: (value)=>{ edgeTopPct=value; S('edgeTopPct', value); },
-    edgeWidthPx: (value)=>{ edgeWidthPx=value; S('edgeWidthPx', value); },
-    edgeHoverWidthPx: (value)=>{ edgeHoverWidthPx=value; S('edgeHoverWidthPx', value); },
-    edgeHoverRangePx: (value)=>{ edgeHoverRangePx=value; S('edgeHoverRangePx', value); },
-    edgeAutoHideSec: (value)=>{ edgeAutoHideSec=value; S('edgeAutoHideSec', value); },
+    edgeHeightPx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 60, max: 400, fallback: fallbackNumber(edgeHeightPx, 'edgeHeightPx') });
+      edgeHeightPx=next; S('edgeHeightPx', next); styleEdge(); styleSensor();
+    },
+    edgeTopPct: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 0, max: 100, fallback: fallbackNumber(edgeTopPct, 'edgeTopPct') });
+      edgeTopPct=next; S('edgeTopPct', next); styleEdge(); styleSensor();
+    },
+    edgeWidthPx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 2, max: 40, fallback: fallbackNumber(edgeWidthPx, 'edgeWidthPx') });
+      edgeWidthPx=next; S('edgeWidthPx', next);
+      if(edgeHoverWidthPx<edgeWidthPx){ edgeHoverWidthPx=edgeWidthPx; S('edgeHoverWidthPx', edgeHoverWidthPx); }
+      styleEdge();
+    },
+    edgeHoverWidthPx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: edgeWidthPx, max: 60, fallback: fallbackNumber(edgeHoverWidthPx, 'edgeHoverWidthPx') });
+      edgeHoverWidthPx=next; S('edgeHoverWidthPx', next);
+    },
+    edgeHoverRangePx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 6, max: 80, fallback: fallbackNumber(edgeHoverRangePx, 'edgeHoverRangePx') });
+      edgeHoverRangePx=next; S('edgeHoverRangePx', next); styleSensor();
+    },
+    edgeAutoHideSec: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseFloat(v), min: 0, max: 10, fallback: fallbackNumber(edgeAutoHideSec, 'edgeAutoHideSec') });
+      edgeAutoHideSec=next; S('edgeAutoHideSec', next);
+    },
     infScrollEnabled: (value)=>{
       infScrollEnabled=value;
       S('infScrollEnabled', value);
@@ -1670,31 +1701,69 @@
       }
       updateInfStopNotice();
     },
-    infScrollSentinelPx: (value)=>{ infScrollSentinelPx=value; S('infScrollSentinelPx', value); },
-    infScrollTimeoutMs: (value)=>{ infScrollTimeoutMs=value; S('infScrollTimeoutMs', value); },
+    infScrollSentinelPx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 200, max: 4000, fallback: fallbackNumber(infScrollSentinelPx, 'infScrollSentinelPx') });
+      infScrollSentinelPx=next; S('infScrollSentinelPx', next);
+    },
+    infScrollTimeoutMs: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 500, max: 15000, fallback: fallbackNumber(infScrollTimeoutMs, 'infScrollTimeoutMs') });
+      infScrollTimeoutMs=next; S('infScrollTimeoutMs', next);
+    },
     infScrollLoaderSel: (value)=>{ infScrollLoaderSel=value; S('infScrollLoaderSel', value); },
     smartPauseEnabled: (value)=>{ smartPauseEnabled=value; S('smartPauseEnabled', value); },
     smartPause_wheel: (value)=>{ smartPause_wheel=value; S('smartPause_wheel', value); },
     smartPause_keys: (value)=>{ smartPause_keys=value; S('smartPause_keys', value); },
     smartPause_select: (value)=>{ smartPause_select=value; S('smartPause_select', value); },
     smartPause_focusInput: (value)=>{ smartPause_focusInput=value; S('smartPause_focusInput', value); },
-    smartResumeMs: (value)=>{ smartResumeMs=value; S('smartResumeMs', value); },
+    smartResumeMs: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 500, max: 15000, fallback: fallbackNumber(smartResumeMs, 'smartResumeMs') });
+      smartResumeMs=next; S('smartResumeMs', next);
+    },
     smartNoResumeIfInputFocused: (value)=>{ smartNoResumeIfInputFocused=value; S('smartNoResumeIfInputFocused', value); },
-    rampStartMs: (value)=>{ rampStartMs=value; S('rampStartMs', value); },
-    rampStopMs: (value)=>{ rampStopMs=value; S('rampStopMs', value); },
-    boostShiftMul: (value)=>{ boostShiftMul=value; S('boostShiftMul', value); },
-    boostCtrlMul: (value)=>{ boostCtrlMul=value; S('boostCtrlMul', value); },
+    rampStartMs: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 0, max: 3000, fallback: fallbackNumber(rampStartMs, 'rampStartMs') });
+      rampStartMs=next; S('rampStartMs', next);
+    },
+    rampStopMs: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 0, max: 3000, fallback: fallbackNumber(rampStopMs, 'rampStopMs') });
+      rampStopMs=next; S('rampStopMs', next);
+    },
+    boostShiftMul: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseFloat(v), min: 1, max: 5, fallback: fallbackNumber(boostShiftMul, 'boostShiftMul') });
+      boostShiftMul=next; S('boostShiftMul', next);
+    },
+    boostCtrlMul: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseFloat(v), min: 1, max: 5, fallback: fallbackNumber(boostCtrlMul, 'boostCtrlMul') });
+      boostCtrlMul=next; S('boostCtrlMul', next);
+    },
     boostAllowCombine: (value)=>{ boostAllowCombine=value; S('boostAllowCombine', value); },
     invertDirection: (value)=>{ invertDirection=value; S('invertDirection', value); },
     theme: (value)=>{ theme=value; S('theme', value); },
-    panelOpacity: (value)=>{ panelOpacity=value; S('panelOpacity', value); },
+    panelOpacity: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseFloat(v), min: 0.7, max: 1, fallback: fallbackNumber(panelOpacity, 'panelOpacity') });
+      panelOpacity=next; S('panelOpacity', next);
+    },
     a11yEnabled: (value)=>{ a11yEnabled=value; S('a11yEnabled', value); },
-    fontScalePct: (value)=>{ fontScalePct=value; S('fontScalePct', value); },
-    panelScalePct: (value)=>{ panelScalePct=clamp(parseInt(value)||100,50,250); S('panelScalePct', panelScalePct); applyPanelScale(); if(elScale) elScale.value=String(panelScalePct); },
-    borderRadiusPx: (value)=>{ borderRadiusPx=value; S('borderRadiusPx', value); },
+    fontScalePct: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 80, max: 130, fallback: fallbackNumber(fontScalePct, 'fontScalePct') });
+      fontScalePct=next; S('fontScalePct', next);
+    },
+    panelScalePct: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 50, max: 250, fallback: fallbackNumber(panelScalePct, 'panelScalePct') });
+      panelScalePct=next; S('panelScalePct', panelScalePct); applyPanelScale(); if(elScale) elScale.value=String(panelScalePct); },
+    borderRadiusPx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 8, max: 24, fallback: fallbackNumber(borderRadiusPx, 'borderRadiusPx') });
+      borderRadiusPx=next; S('borderRadiusPx', next);
+    },
     compactUI: (value)=>{ compactUI=value; S('compactUI', value); },
-    panelWidthPx: (value)=>{ panelWidthPx=value; S('panelWidthPx', value); },
-    shadowAlpha: (value)=>{ shadowAlpha=value; S('shadowAlpha', value); },
+    panelWidthPx: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 260, max: 520, fallback: fallbackNumber(panelWidthPx, 'panelWidthPx') });
+      panelWidthPx=next; S('panelWidthPx', next);
+    },
+    shadowAlpha: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseFloat(v), min: 0, max: 0.6, fallback: fallbackNumber(shadowAlpha, 'shadowAlpha') });
+      shadowAlpha=next; S('shadowAlpha', next);
+    },
     accent: (value)=>{ accent=value; S('accent', value); },
     forceSubdomain: (value)=>{ forceSubdomain=value; S('forceSubdomain', value); },
     forceSubdomainNoPromptHosts: (value)=>{ forceSubdomainNoPromptHosts=value; S('forceSubdomainNoPromptHosts', value); },
