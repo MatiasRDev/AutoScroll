@@ -315,7 +315,7 @@
 
   const getPanelScale = () => Math.max(0.01, panelScalePct) / 100;
 
-  const updatePanelTransform = () => {
+  const applyPanelTransform = () => {
     const scale = getPanelScale();
     const pos = panelPos || { x: 0, y: 0 };
     const tx = pos.x / scale;
@@ -323,8 +323,22 @@
     panel.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
   };
 
-  function clampPanelToViewport(panelEl = panel, { marginPx = VIEW_MARGIN, persist = false } = {}) {
-    const rect = measurePanelRect(panelEl);
+  function persistPanelPosition() {
+    if (!panelPos) return;
+    S('panelPos', panelPos);
+  }
+
+  function ensurePanelInViewport({ marginPx = VIEW_MARGIN, persist = true } = {}) {
+    if (!panel || !panel.isConnected) return;
+    if (!panelPos) {
+      const initialRect = measurePanelRect(panel);
+      if (!initialRect) return;
+      panelPos = { x: initialRect.left, y: initialRect.top };
+    }
+
+    applyPanelTransform();
+
+    const rect = measurePanelRect(panel);
     if (!rect) return;
 
     const { left: vpLeft, top: vpTop, width: vw, height: vh } = getViewportBox();
@@ -337,58 +351,29 @@
     const maxTop = Math.max(minTop, vpBottom - rect.height - marginPx);
 
     const clampedLeft = clamp(Math.round(rect.left), minLeft, maxLeft);
-    const clampedTop  = clamp(Math.round(rect.top),  minTop,  maxTop);
+    const clampedTop = clamp(Math.round(rect.top), minTop, maxTop);
 
-    if (!panelPos) {
-      panelPos = { x: rect.left, y: rect.top };
+    if (clampedLeft !== rect.left || clampedTop !== rect.top) {
+      panelPos = {
+        x: panelPos.x + (clampedLeft - rect.left),
+        y: panelPos.y + (clampedTop - rect.top)
+      };
     }
-    panelPos = {
-      x: panelPos.x + (clampedLeft - rect.left),
-      y: panelPos.y + (clampedTop - rect.top)
-    };
-    updatePanelTransform();
+
+    applyPanelTransform();
     if (persist) persistPanelPosition();
-  }
-
-  function isPanelOutOfViewport(panelEl = panel, { marginPx = VIEW_MARGIN } = {}) {
-    const rect = measurePanelRect(panelEl);
-    if (!rect) return false;
-
-    const { left: vpLeft, top: vpTop, width: vw, height: vh } = getViewportBox();
-    const vpRight = vpLeft + vw;
-    const vpBottom = vpTop + vh;
-
-    const withinHoriz = rect.right >= vpLeft + marginPx && rect.left <= vpRight - marginPx;
-    const withinVert = rect.bottom >= vpTop + marginPx && rect.top <= vpBottom - marginPx;
-    return !(withinHoriz && withinVert);
-  }
-
-  function persistPanelPosition() {
-    if (!panelPos) return;
-    S('panelPos', panelPos);
   }
 
   function movePanelToSafeSpot(panelEl = panel, { marginPx = VIEW_MARGIN, persist = true } = {}) {
     const { left: vpLeft, top: vpTop } = getViewportBox();
     panelPos = { x: Math.round(vpLeft + marginPx), y: Math.round(vpTop + marginPx) };
-    updatePanelTransform();
-    clampPanelToViewport(panelEl, { marginPx });
-    if (persist) persistPanelPosition();
+    applyPanelTransform();
+    ensurePanelInViewport({ marginPx, persist });
   }
 
   function resetPanelPositionToSafeViewport({ marginPx = 20, persist = true } = {}) {
     if (!panel || !panel.isConnected) return;
     movePanelToSafeSpot(panel, { marginPx, persist });
-  }
-
-  function ensurePanelWithinViewport({ marginPx = VIEW_MARGIN, persist = true } = {}) {
-    if (!panel || !panel.isConnected) return;
-    if (isPanelOutOfViewport(panel, { marginPx })) {
-      movePanelToSafeSpot(panel, { marginPx, persist });
-    } else {
-      clampPanelToViewport(panel, { marginPx });
-      if (persist) persistPanelPosition();
-    }
   }
 
   const debounce = (fn, ms = 60) => {
@@ -398,7 +383,7 @@
 
   function handleViewportChange(){
     if(autoPanelScaleByZoom){ applyPanelScale({ fromZoom: true, withClamp: false }); }
-    ensurePanelWithinViewport();
+    ensurePanelInViewport();
   }
 
   // Re-clamp al cambiar tamaño de ventana o viewport visual (zoom móvil/desktop)
@@ -513,9 +498,9 @@
     } else {
       panelScalePct = clamp(panelScalePct, PANEL_SCALE_MANUAL_MIN, PANEL_SCALE_MANUAL_MAX);
     }
-    updatePanelTransform();
+    applyPanelTransform();
     syncScaleControls();
-    if(withClamp) ensurePanelWithinViewport();
+    if(withClamp) ensurePanelInViewport();
   }
   setAccent(accent);
   panel.setAttribute('role','dialog');
@@ -529,7 +514,8 @@
       panel.style.top = '0px';
       panel.style.right = 'unset';
       panel.style.bottom = 'unset';
-      updatePanelTransform();
+      applyPanelTransform();
+      ensurePanelInViewport({ persist: false });
       return true;
     }
     const rect = measurePanelRect(panel);
@@ -539,7 +525,8 @@
       panel.style.top = '0px';
       panel.style.right = 'unset';
       panel.style.bottom = 'unset';
-      updatePanelTransform();
+      applyPanelTransform();
+      ensurePanelInViewport({ persist: false });
       return true;
     }
     return false;
@@ -925,7 +912,7 @@
   if(!hasStoredPanelPosition()){
     resetPanelPositionToSafeViewport();
   }
-  ensurePanelWithinViewport();
+  ensurePanelInViewport();
 
   /* ------------------------ Edge strip + sensor ------------------------ */
   let edgeStrip=null, edgeSensor=null, edgeAutoHideTimer=null;
@@ -1000,14 +987,13 @@
       const nx = startPos.x + (e.clientX - sx);
       const ny = startPos.y + (e.clientY - sy);
       panelPos = { x: nx, y: ny };
-      updatePanelTransform();
-      clampPanelToViewport(undefined, { persist: false }); // asegura que no se salga mientras arrastras
+      ensurePanelInViewport({ persist: false }); // asegura que no se salga mientras arrastras
     });
 
     on(window,'mouseup',()=>{
       if(!drag) return;
       drag = false;
-      ensurePanelWithinViewport(); // por si quedó al borde, lo re-ajusta y persiste
+      ensurePanelInViewport(); // por si quedó al borde, lo re-ajusta y persiste
     });
   })();
 
@@ -1122,11 +1108,11 @@
     const collapsed=!sec.classList.contains('collapsed'); sec.classList.toggle('collapsed',collapsed); body.style.display=collapsed?'none':'';
     const id=sec.id; const keyMap={secBasic:'secBasicOpen',secVisibility:'secVisibilityOpen',secGestures:'secGesturesOpen',secPause:'secPauseOpen',secCurves:'secCurvesOpen',secRules:'secRulesOpen',secProfiles:'secProfilesOpen',secAppearance:'secAppearanceOpen',secTools:'secToolsOpen',secAdvanced:'secAdvancedOpen'};
     const k=keyMap[id]; if(k) S(k,!collapsed);
-    ensurePanelWithinViewport();
+    ensurePanelInViewport();
   }
 
   /* ------------------------ Panel visibility API ------------------------ */
-  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); ensurePanelWithinViewport(); updateInfStopNotice(); };
+  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); ensurePanelInViewport(); updateInfStopNotice(); };
   const hidePanelFull = ()=>{ panel.style.display='none'; hideEdge(); panelVisibility='hidden_full'; S('panelVisibility',panelVisibility); };
   const hidePanelEdge = ()=>{ panel.style.display='none'; showEdge(); panelVisibility='hidden_edge'; S('panelVisibility',panelVisibility); };
 
@@ -1143,11 +1129,11 @@
   /* ------------------------ Toggle + collapse behavior ------------------------ */
   on(elToggle,'click',()=>toggleRun());
   on(elCollapse,'click',(e)=>{
-    if(panelCollapsed || elBody.style.display==='none'){ panelCollapsed=false; S('panelCollapsed',panelCollapsed); elBody.style.display=''; elCollapse.classList.remove('collapsed'); showPanel(); hideEdge(); ensurePanelWithinViewport(); return; }
-    ensurePanelWithinViewport();
-    if(useEdgeStrip && !e.ctrlKey){ hidePanelEdge(); ensurePanelWithinViewport(); return; }
+    if(panelCollapsed || elBody.style.display==='none'){ panelCollapsed=false; S('panelCollapsed',panelCollapsed); elBody.style.display=''; elCollapse.classList.remove('collapsed'); showPanel(); hideEdge(); ensurePanelInViewport(); return; }
+    ensurePanelInViewport();
+    if(useEdgeStrip && !e.ctrlKey){ hidePanelEdge(); ensurePanelInViewport(); return; }
     panelCollapsed=true; S('panelCollapsed',panelCollapsed); elBody.style.display='none'; elCollapse.classList.add('collapsed');
-    ensurePanelWithinViewport();
+    ensurePanelInViewport();
   });
 
   /* ------------------------ Core autoscroll ------------------------ */
@@ -1313,7 +1299,7 @@
   on(elTheme,'change',e=>{ theme=e.target.value; S('theme',theme); panel.classList.toggle('tm-light', theme==='light' || (theme==='auto' && matchMedia?.('(prefers-color-scheme: light)').matches)); });
   on(elOpacity,'change',e=>{ panelOpacity=clamp(parseFloat(e.target.value)||0.85,0.7,1); S('panelOpacity',panelOpacity); panel.style.opacity=String(panelOpacity); });
   on(elA11y,'change',e=>{ a11yEnabled=!!e.target.checked; S('a11yEnabled',a11yEnabled); });
-  on(elFontScale,'change',e=>{ fontScalePct=clamp(parseInt(e.target.value)||100,80,130); S('fontScalePct',fontScalePct); panel.style.fontSize = `${13*fontScalePct/100}px`; ensurePanelWithinViewport(); });
+  on(elFontScale,'change',e=>{ fontScalePct=clamp(parseInt(e.target.value)||100,80,130); S('fontScalePct',fontScalePct); panel.style.fontSize = `${13*fontScalePct/100}px`; ensurePanelInViewport(); });
   on(elScale,'change',e=>{
     if(autoPanelScaleByZoom){ syncScaleControls(); return; }
     panelScalePct=clamp(parseInt(e.target.value)||100,50,250);
@@ -1329,7 +1315,7 @@
   });
   on(elRadius,'change',e=>{ borderRadiusPx=clamp(parseInt(e.target.value)||12,8,24); S('borderRadiusPx',borderRadiusPx); panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`); });
   on(elCompact,'change',e=>{ compactUI=!!e.target.checked; S('compactUI',compactUI); panel.classList.toggle('compact',compactUI); });
-  on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); ensurePanelWithinViewport(); });
+  on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); ensurePanelInViewport(); });
   on(elShadow,'change',e=>{ shadowAlpha=clamp(parseFloat(e.target.value)||0.33,0,0.6); S('shadowAlpha',shadowAlpha); panel.style.setProperty('--tm-shadow-a', String(shadowAlpha)); });
   on(elAccent,'change',e=>{ accent=e.target.value; S('accent',accent); setAccent(accent); });
 
@@ -2040,7 +2026,7 @@
         panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
         applyPanelScale();
         setAccent(accent);
-        ensurePanelWithinViewport();
+        ensurePanelInViewport();
       }
       if(Array.isArray(g.rules)) { rules=g.rules; S('rules',rules); renderRules(); }
       if('rulesAutoStart' in g){ rulesAutoStart=g.rulesAutoStart; S('rulesAutoStart',rulesAutoStart); panel.querySelector('#tmRulesAutoStart').checked=rulesAutoStart; }
