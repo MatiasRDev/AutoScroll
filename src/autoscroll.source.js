@@ -357,6 +357,11 @@
     if (persist) persistPanelPosition(panelEl);
   }
 
+  function resetPanelPositionToSafeViewport({ marginPx = 20, persist = true } = {}) {
+    if (!panel || !panel.isConnected) return;
+    movePanelToSafeSpot(panel, { marginPx, persist });
+  }
+
   function ensurePanelWithinViewport({ marginPx = VIEW_MARGIN, persist = true } = {}) {
     if (!panel || !panel.isConnected) return;
     if (isPanelOutOfViewport(panel, { marginPx })) {
@@ -498,8 +503,10 @@
   panel.setAttribute('role','dialog');
   panel.setAttribute('aria-label','AutoScroll');
 
+  const hasStoredPanelPosition = () => panelPos && Number.isFinite(panelPos.left) && Number.isFinite(panelPos.top);
+
   const applyStoredPanelPosition = () => {
-    if(panelPos && Number.isFinite(panelPos.left) && Number.isFinite(panelPos.top)){
+    if(hasStoredPanelPosition()){
       panel.style.left = px(panelPos.left);
       panel.style.top = px(panelPos.top);
       panel.style.right = 'unset';
@@ -883,6 +890,9 @@
     <div class="tm-as-footer">Estado: <span class="tm-as-status tm-state ${running?'on':'off'}" id="tmFooter">${running?'● Desplazando…':'● Inactivo'}</span></div>
   `;
   document.documentElement.appendChild(panel);
+  if(!hasStoredPanelPosition()){
+    resetPanelPositionToSafeViewport();
+  }
   ensurePanelWithinViewport();
 
   /* ------------------------ Edge strip + sensor ------------------------ */
@@ -2034,6 +2044,7 @@
     GM_registerMenuCommand('Mostrar/Ocultar Panel',()=>{ if(panelVisibility==='visible') hidePanelFull(); else showPanel(); });
     GM_registerMenuCommand('Ocultar Panel con Tira',()=>hidePanelEdge());
     GM_registerMenuCommand('Colapsar/Expandir Panel',()=>panel.querySelector('#tmCollapse').click());
+    GM_registerMenuCommand('Restablecer posición del panel',()=>resetPanelPositionToSafeViewport());
   }catch{}
 
   // Estado inicial de UI
