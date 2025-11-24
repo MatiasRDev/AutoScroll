@@ -46,6 +46,7 @@ async function bootstrapBundle({ gmValues = {}, windowOverrides = {}, preamble =
   const windowObj = vmContext.window ?? vmContext;
   const called = new Map();
   const gmStorage = new Map(Object.entries(gmValues));
+  const menuCommands = [];
   const mark = (name) => {
     const total = called.get(name) ?? 0;
     called.set(name, total + 1);
@@ -63,8 +64,9 @@ async function bootstrapBundle({ gmValues = {}, windowOverrides = {}, preamble =
     GM_addStyle: () => {
       mark('GM_addStyle');
     },
-    GM_registerMenuCommand: () => {
+    GM_registerMenuCommand: (name, fn) => {
       mark('GM_registerMenuCommand');
+      menuCommands.push({ name, fn });
     },
   };
 
@@ -89,6 +91,23 @@ async function bootstrapBundle({ gmValues = {}, windowOverrides = {}, preamble =
   ensureMethod(windowObj, 'scrollTo', () => {});
   ensureMethod(windowObj, 'scrollBy', () => {});
   ensureMethod(windowObj, 'getSelection', () => ({ isCollapsed: true }));
+  if (windowObj.history) {
+    const href = windowObj.location?.href ?? '';
+    if (typeof windowObj.history.pushState === 'function') {
+      const origPush = windowObj.history.pushState.bind(windowObj.history);
+      windowObj.history.pushState = (...args) => {
+        const normalized = args.length >= 2 ? args : [args[0], '', href];
+        return origPush(...normalized);
+      };
+    }
+    if (typeof windowObj.history.replaceState === 'function') {
+      const origReplace = windowObj.history.replaceState.bind(windowObj.history);
+      windowObj.history.replaceState = (...args) => {
+        const normalized = args.length >= 2 ? args : [args[0], '', href];
+        return origReplace(...normalized);
+      };
+    }
+  }
   ensureMethod(windowObj, 'IntersectionObserver', class {
     constructor() {}
     observe() {}
@@ -145,7 +164,7 @@ async function bootstrapBundle({ gmValues = {}, windowOverrides = {}, preamble =
     }
   };
 
-  return { code, bundleHash: hash, called, gmStorage, windowObj, triggerDomReady, clickToggle, cleanup };
+  return { code, bundleHash: hash, called, gmStorage, windowObj, menuCommands, triggerDomReady, clickToggle, cleanup };
 }
 
 test('el bundle invoca las APIs GM al inicializar', async () => {
@@ -186,6 +205,37 @@ test('inserta el panel y el toggle actualiza el estado', async () => {
     clickToggle();
     expect(gmStorage.get('running')).toBe(false);
     expect(toggleButton?.textContent).toMatch(/Iniciar/i);
+  } finally {
+    cleanup();
+  }
+});
+
+test('el comando de reset reubica y persiste el panel fuera del viewport', async () => {
+  const initialPos = { left: 5000, top: 5000 };
+  const { gmStorage, windowObj, menuCommands, triggerDomReady, cleanup } = await bootstrapBundle({
+    gmValues: { panelPos: initialPos },
+  });
+
+  try {
+    triggerDomReady();
+
+    const panel = windowObj.document.querySelector('.tm-as-panel');
+    expect(panel).toBeTruthy();
+    panel.style.left = '5000px';
+    panel.style.top = '5000px';
+    gmStorage.set('panelPos', initialPos);
+
+    expect(panel?.style.left).toBe('5000px');
+    expect(panel?.style.top).toBe('5000px');
+
+    const resetCmd = menuCommands.find(({ name }) => /Restablecer posición/i.test(name));
+    expect(resetCmd?.fn).toBeTypeOf('function');
+
+    resetCmd?.fn();
+
+    expect(panel?.style.left).toBe('20px');
+    expect(panel?.style.top).toBe('20px');
+    expect(gmStorage.get('panelPos')).toEqual({ left: 20, top: 20 });
   } finally {
     cleanup();
   }
