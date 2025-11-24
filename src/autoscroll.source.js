@@ -65,11 +65,13 @@
     panelOpacity: 0.85,
     fontScalePct: 100,         // 80..130
     panelScalePct: 100,        // 50..250
+    autoPanelScaleByZoom: false,
     borderRadiusPx: 12,        // 8..24
     compactUI: false,
     panelWidthPx: 300,         // 260..520
     shadowAlpha: 0.33,         // 0..0.6
     accent: 'teal',            // teal|blue|indigo|amber|pink
+    panelPos: null,
 
     // Debug overlay
     debugOverlay: false,
@@ -223,12 +225,15 @@
   let theme = G('theme');
   let panelOpacity = G('panelOpacity');
   let panelScalePct = G('panelScalePct');
+  let autoPanelScaleByZoom = G('autoPanelScaleByZoom');
   let fontScalePct = G('fontScalePct');
   let borderRadiusPx = G('borderRadiusPx');
   let compactUI = G('compactUI');
   let panelWidthPx = G('panelWidthPx');
   let shadowAlpha = G('shadowAlpha');
   let accent = G('accent');
+
+  let panelPos = G('panelPos');
 
   let debugOverlay = G('debugOverlay');
   let debugShowFps = G('debugShowFps');
@@ -262,31 +267,104 @@
   const toKeySig = (e)=>{const p=[]; if(e.ctrlKey)p.push('Ctrl'); if(e.altKey)p.push('Alt'); if(e.shiftKey)p.push('Shift'); const k=e.key.length===1?e.key.toUpperCase():e.key; if(!['Control','Shift','Alt','Meta'].includes(k)) p.push(k); return p.join('+');};
   const px = (n)=>`${n}px`;
   const on = (el,ev,fn,opt)=>el.addEventListener(ev,fn,opt);
+  let syncScaleControls = ()=>{};
 
   // --- Viewport clamp (evita que el panel quede fuera de pantalla) ---
   const VIEW_MARGIN = 8; // margen mínimo interno
 
-  function clampPanelToViewport() {
-    if (!panel || !panel.isConnected || panel.style.display === 'none') return;
-    const r = panel.getBoundingClientRect();
-    let left = r.left;
-    let top  = r.top;
+  const PANEL_SCALE_MANUAL_MIN = 50, PANEL_SCALE_MANUAL_MAX = 250;
+  const PANEL_SCALE_AUTO_MIN = 70, PANEL_SCALE_AUTO_MAX = 200;
 
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+  const getViewportBox = () => {
+    if (window.visualViewport) {
+      return {
+        left: visualViewport.offsetLeft || 0,
+        top: visualViewport.offsetTop || 0,
+        width: visualViewport.width,
+        height: visualViewport.height
+      };
+    }
+    return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+  };
 
-    // Cuando el panel es más grande que el viewport, al menos dejamos un margen
-    const maxLeft = Math.max(VIEW_MARGIN, vw - r.width  - VIEW_MARGIN);
-    const maxTop  = Math.max(VIEW_MARGIN, vh - r.height - VIEW_MARGIN);
+  function measurePanelRect(panelEl) {
+    if (!panelEl || !panelEl.isConnected) return null;
+    const prevDisplay = panelEl.style.display;
+    const prevVisibility = panelEl.style.visibility;
+    const wasHidden = prevDisplay === 'none';
+    if (wasHidden) {
+      panelEl.style.visibility = 'hidden';
+      panelEl.style.display = 'block';
+    }
+    const rect = panelEl.getBoundingClientRect();
+    if (wasHidden) {
+      panelEl.style.display = prevDisplay;
+      panelEl.style.visibility = prevVisibility;
+    }
+    return rect;
+  }
 
-    left = clamp(Math.round(left), VIEW_MARGIN, maxLeft);
-    top  = clamp(Math.round(top),  VIEW_MARGIN, maxTop);
+  function clampPanelToViewport(panelEl = panel, { marginPx = VIEW_MARGIN } = {}) {
+    const rect = measurePanelRect(panelEl);
+    if (!rect) return;
 
-    // Anclamos por left/top para que el clamping sea predecible
-    panel.style.right  = 'unset';
-    panel.style.bottom = 'unset';
-    panel.style.left   = left + 'px';
-    panel.style.top    = top  + 'px';
+    const { left: vpLeft, top: vpTop, width: vw, height: vh } = getViewportBox();
+    const vpRight = vpLeft + vw;
+    const vpBottom = vpTop + vh;
+
+    const minLeft = vpLeft + marginPx;
+    const minTop = vpTop + marginPx;
+    const maxLeft = Math.max(minLeft, vpRight - rect.width - marginPx);
+    const maxTop = Math.max(minTop, vpBottom - rect.height - marginPx);
+
+    const left = clamp(Math.round(rect.left), minLeft, maxLeft);
+    const top  = clamp(Math.round(rect.top),  minTop,  maxTop);
+
+    panelEl.style.right  = 'unset';
+    panelEl.style.bottom = 'unset';
+    panelEl.style.left   = px(left);
+    panelEl.style.top    = px(top);
+  }
+
+  function isPanelOutOfViewport(panelEl = panel, { marginPx = VIEW_MARGIN } = {}) {
+    const rect = measurePanelRect(panelEl);
+    if (!rect) return false;
+
+    const { left: vpLeft, top: vpTop, width: vw, height: vh } = getViewportBox();
+    const vpRight = vpLeft + vw;
+    const vpBottom = vpTop + vh;
+
+    const withinHoriz = rect.right >= vpLeft + marginPx && rect.left <= vpRight - marginPx;
+    const withinVert = rect.bottom >= vpTop + marginPx && rect.top <= vpBottom - marginPx;
+    return !(withinHoriz && withinVert);
+  }
+
+  function persistPanelPosition(panelEl = panel) {
+    const left = parseFloat(panelEl?.style?.left);
+    const top = parseFloat(panelEl?.style?.top);
+    if (!Number.isFinite(left) || !Number.isFinite(top)) return;
+    panelPos = { left, top };
+    S('panelPos', panelPos);
+  }
+
+  function movePanelToSafeSpot(panelEl = panel, { marginPx = VIEW_MARGIN, persist = true } = {}) {
+    const { left: vpLeft, top: vpTop } = getViewportBox();
+    panelEl.style.right  = 'unset';
+    panelEl.style.bottom = 'unset';
+    panelEl.style.left   = px(Math.round(vpLeft + marginPx));
+    panelEl.style.top    = px(Math.round(vpTop + marginPx));
+    clampPanelToViewport(panelEl, { marginPx });
+    if (persist) persistPanelPosition(panelEl);
+  }
+
+  function ensurePanelWithinViewport({ marginPx = VIEW_MARGIN, persist = true } = {}) {
+    if (!panel || !panel.isConnected) return;
+    if (isPanelOutOfViewport(panel, { marginPx })) {
+      movePanelToSafeSpot(panel, { marginPx, persist });
+    } else {
+      clampPanelToViewport(panel, { marginPx });
+      if (persist) persistPanelPosition(panel);
+    }
   }
 
   const debounce = (fn, ms = 60) => {
@@ -294,11 +372,17 @@
     return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
   };
 
+  function handleViewportChange(){
+    if(autoPanelScaleByZoom){ applyPanelScale({ fromZoom: true, withClamp: false }); }
+    ensurePanelWithinViewport();
+  }
+
   // Re-clamp al cambiar tamaño de ventana o viewport visual (zoom móvil/desktop)
-  on(window, 'resize', debounce(clampPanelToViewport, 60));
+  const onViewportChange = debounce(handleViewportChange, 60);
+  on(window, 'resize', onViewportChange);
   if (window.visualViewport) {
-    on(visualViewport, 'resize', debounce(clampPanelToViewport, 60));
-    on(visualViewport, 'scroll', debounce(clampPanelToViewport, 60));
+    on(visualViewport, 'resize', onViewportChange);
+    on(visualViewport, 'scroll', onViewportChange);
   }
 
   /* ------------------------ CSS ------------------------ */
@@ -387,11 +471,42 @@
   panel.style.setProperty('--tm-radius', `${clamp(borderRadiusPx,8,24)}px`);
   panel.style.setProperty('--tm-width', `${clamp(panelWidthPx,260,520)}px`);
   panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
-  function applyPanelScale(){ panelScalePct=clamp(panelScalePct,50,250); panel.style.setProperty('--tm-scale', String(panelScalePct/100)); clampPanelToViewport(); }
+  const getPageZoom = () => {
+    if(window.visualViewport && typeof visualViewport.scale === 'number' && visualViewport.scale>0){
+      return visualViewport.scale;
+    }
+    return window.devicePixelRatio || 1;
+  };
+  function computeAutoPanelScale(){
+    const zoom = getPageZoom() || 1;
+    const targetScale = Math.round(100/zoom);
+    return clamp(targetScale, PANEL_SCALE_AUTO_MIN, PANEL_SCALE_AUTO_MAX);
+  }
+  function applyPanelScale({ fromZoom=false, withClamp=true } = {}){
+    if(autoPanelScaleByZoom || fromZoom){
+      panelScalePct = computeAutoPanelScale();
+      S('panelScalePct', panelScalePct);
+    } else {
+      panelScalePct = clamp(panelScalePct, PANEL_SCALE_MANUAL_MIN, PANEL_SCALE_MANUAL_MAX);
+    }
+    panel.style.setProperty('--tm-scale', String(panelScalePct/100));
+    syncScaleControls();
+    if(withClamp) ensurePanelWithinViewport();
+  }
   applyPanelScale();
   setAccent(accent);
   panel.setAttribute('role','dialog');
   panel.setAttribute('aria-label','AutoScroll');
+
+  const applyStoredPanelPosition = () => {
+    if(panelPos && Number.isFinite(panelPos.left) && Number.isFinite(panelPos.top)){
+      panel.style.left = px(panelPos.left);
+      panel.style.top = px(panelPos.top);
+      panel.style.right = 'unset';
+      panel.style.bottom = 'unset';
+    }
+  };
+  applyStoredPanelPosition();
 
   function setAccent(name){
     const ac = ACCENTS[name] || ACCENTS.teal;
@@ -630,6 +745,7 @@
           <div class="tm-as-inline">
             <label class="tm-as-label">Escala UI (%)</label>
             <input class="tm-as-num" id="tmScale" type="number" min="50" max="250" step="5" value="${panelScalePct}">
+            <label class="tm-as-checkbox"><input type="checkbox" id="tmScaleAuto" ${autoPanelScaleByZoom?'checked':''}> <span class="tm-as-label">Ajustar escala según zoom de página (auto)</span></label>
           </div>
           <div class="tm-as-inline">
             <label class="tm-as-label">Ancho panel (px)</label>
@@ -767,7 +883,7 @@
     <div class="tm-as-footer">Estado: <span class="tm-as-status tm-state ${running?'on':'off'}" id="tmFooter">${running?'● Desplazando…':'● Inactivo'}</span></div>
   `;
   document.documentElement.appendChild(panel);
-  clampPanelToViewport();
+  ensurePanelWithinViewport();
 
   /* ------------------------ Edge strip + sensor ------------------------ */
   let edgeStrip=null, edgeSensor=null, edgeAutoHideTimer=null;
@@ -852,7 +968,7 @@
     on(window,'mouseup',()=>{
       if(!drag) return;
       drag = false;
-      clampPanelToViewport(); // por si quedó al borde, lo re-ajusta
+      ensurePanelWithinViewport(); // por si quedó al borde, lo re-ajusta y persiste
     });
   })();
 
@@ -916,6 +1032,7 @@
   const elA11y = panel.querySelector('#tmA11y');
   const elFontScale = panel.querySelector('#tmFontScale');
   const elScale = panel.querySelector('#tmScale');
+  const elScaleAuto = panel.querySelector('#tmScaleAuto');
   const elRadius = panel.querySelector('#tmRadius');
   const elCompact = panel.querySelector('#tmCompact');
   const elWidthPx = panel.querySelector('#tmWidthPx');
@@ -946,6 +1063,16 @@
   const elProfilesList = panel.querySelector('#tmProfilesList');
   const btnProfileSave = panel.querySelector('#tmProfileSave');
 
+  syncScaleControls = ()=>{
+    if(elScaleAuto) elScaleAuto.checked = !!autoPanelScaleByZoom;
+    if(elScale){
+      elScale.disabled = !!autoPanelScaleByZoom;
+      elScale.value = String(panelScalePct);
+      elScale.title = autoPanelScaleByZoom ? 'Escala ajustada automáticamente por zoom' : '';
+    }
+  };
+  syncScaleControls();
+
   /* ------------------------ Acordeón ------------------------ */
   for (const sec of panel.querySelectorAll('.tm-sec')) {
     const head=sec.querySelector('.tm-sec-head'), body=sec.querySelector('.tm-sec-body');
@@ -956,11 +1083,11 @@
     const collapsed=!sec.classList.contains('collapsed'); sec.classList.toggle('collapsed',collapsed); body.style.display=collapsed?'none':'';
     const id=sec.id; const keyMap={secBasic:'secBasicOpen',secVisibility:'secVisibilityOpen',secGestures:'secGesturesOpen',secPause:'secPauseOpen',secCurves:'secCurvesOpen',secRules:'secRulesOpen',secProfiles:'secProfilesOpen',secAppearance:'secAppearanceOpen',secTools:'secToolsOpen',secAdvanced:'secAdvancedOpen'};
     const k=keyMap[id]; if(k) S(k,!collapsed);
-    clampPanelToViewport();
+    ensurePanelWithinViewport();
   }
 
   /* ------------------------ Panel visibility API ------------------------ */
-  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); clampPanelToViewport(); updateInfStopNotice(); };
+  const showPanel = ()=>{ panel.style.display='block'; hideEdge(); panelVisibility='visible'; S('panelVisibility',panelVisibility); ensurePanelWithinViewport(); updateInfStopNotice(); };
   const hidePanelFull = ()=>{ panel.style.display='none'; hideEdge(); panelVisibility='hidden_full'; S('panelVisibility',panelVisibility); };
   const hidePanelEdge = ()=>{ panel.style.display='none'; showEdge(); panelVisibility='hidden_edge'; S('panelVisibility',panelVisibility); };
 
@@ -977,11 +1104,11 @@
   /* ------------------------ Toggle + collapse behavior ------------------------ */
   on(elToggle,'click',()=>toggleRun());
   on(elCollapse,'click',(e)=>{
-    if(panelCollapsed || elBody.style.display==='none'){ panelCollapsed=false; S('panelCollapsed',panelCollapsed); elBody.style.display=''; elCollapse.classList.remove('collapsed'); showPanel(); hideEdge(); clampPanelToViewport(); return; }
-    clampPanelToViewport();
-    if(useEdgeStrip && !e.ctrlKey){ hidePanelEdge(); clampPanelToViewport(); return; }
+    if(panelCollapsed || elBody.style.display==='none'){ panelCollapsed=false; S('panelCollapsed',panelCollapsed); elBody.style.display=''; elCollapse.classList.remove('collapsed'); showPanel(); hideEdge(); ensurePanelWithinViewport(); return; }
+    ensurePanelWithinViewport();
+    if(useEdgeStrip && !e.ctrlKey){ hidePanelEdge(); ensurePanelWithinViewport(); return; }
     panelCollapsed=true; S('panelCollapsed',panelCollapsed); elBody.style.display='none'; elCollapse.classList.add('collapsed');
-    clampPanelToViewport();
+    ensurePanelWithinViewport();
   });
 
   /* ------------------------ Core autoscroll ------------------------ */
@@ -1147,16 +1274,23 @@
   on(elTheme,'change',e=>{ theme=e.target.value; S('theme',theme); panel.classList.toggle('tm-light', theme==='light' || (theme==='auto' && matchMedia?.('(prefers-color-scheme: light)').matches)); });
   on(elOpacity,'change',e=>{ panelOpacity=clamp(parseFloat(e.target.value)||0.85,0.7,1); S('panelOpacity',panelOpacity); panel.style.opacity=String(panelOpacity); });
   on(elA11y,'change',e=>{ a11yEnabled=!!e.target.checked; S('a11yEnabled',a11yEnabled); });
-  on(elFontScale,'change',e=>{ fontScalePct=clamp(parseInt(e.target.value)||100,80,130); S('fontScalePct',fontScalePct); panel.style.fontSize = `${13*fontScalePct/100}px`; clampPanelToViewport(); });
+  on(elFontScale,'change',e=>{ fontScalePct=clamp(parseInt(e.target.value)||100,80,130); S('fontScalePct',fontScalePct); panel.style.fontSize = `${13*fontScalePct/100}px`; ensurePanelWithinViewport(); });
   on(elScale,'change',e=>{
+    if(autoPanelScaleByZoom){ syncScaleControls(); return; }
     panelScalePct=clamp(parseInt(e.target.value)||100,50,250);
     S('panelScalePct',panelScalePct);
     applyPanelScale();
-    elScale.value=String(panelScalePct);
+    syncScaleControls();
+  });
+  on(elScaleAuto,'change',e=>{
+    autoPanelScaleByZoom=!!e.target.checked;
+    S('autoPanelScaleByZoom', autoPanelScaleByZoom);
+    applyPanelScale({ fromZoom: autoPanelScaleByZoom });
+    syncScaleControls();
   });
   on(elRadius,'change',e=>{ borderRadiusPx=clamp(parseInt(e.target.value)||12,8,24); S('borderRadiusPx',borderRadiusPx); panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`); });
   on(elCompact,'change',e=>{ compactUI=!!e.target.checked; S('compactUI',compactUI); panel.classList.toggle('compact',compactUI); });
-  on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); clampPanelToViewport(); });
+  on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); ensurePanelWithinViewport(); });
   on(elShadow,'change',e=>{ shadowAlpha=clamp(parseFloat(e.target.value)||0.33,0,0.6); S('shadowAlpha',shadowAlpha); panel.style.setProperty('--tm-shadow-a', String(shadowAlpha)); });
   on(elAccent,'change',e=>{ accent=e.target.value; S('accent',accent); setAccent(accent); });
 
@@ -1434,6 +1568,7 @@
     elTripleAction.value=tripleClickAction; elTripleWindow.value=String(tripleClickWindowMs);
     if(elScale) elScale.value=String(panelScalePct);
     applyPanelScale();
+    syncScaleControls();
   }
   function buildProfileFromCurrentGlobals(){
     return {
@@ -1657,7 +1792,7 @@
         infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel,
         smart: { smartPauseEnabled, smartPause_wheel, smartPause_keys, smartPause_select, smartPause_focusInput, smartResumeMs, smartNoResumeIfInputFocused },
         curves: { rampStartMs, rampStopMs, boostShiftMul, boostCtrlMul, boostAllowCombine, invertDirection },
-        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, panelScalePct, borderRadiusPx, compactUI, panelWidthPx, shadowAlpha, accent },
+        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, panelScalePct, autoPanelScaleByZoom, borderRadiusPx, compactUI, panelWidthPx, shadowAlpha, accent },
         rules, rulesAutoStart,
         profilesConfig: { forceSubdomain, forceSubdomainNoPromptHosts, forceSubdomainDefaultAction },
         psl: { usePslLite, baseDomainOverrides }
@@ -1803,7 +1938,8 @@
     },
     panelScalePct: (value)=>{
       const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 50, max: 250, fallback: fallbackNumber(panelScalePct, 'panelScalePct') });
-      panelScalePct=next; S('panelScalePct', panelScalePct); applyPanelScale(); if(elScale) elScale.value=String(panelScalePct); },
+      panelScalePct=next; S('panelScalePct', panelScalePct); applyPanelScale(); },
+    autoPanelScaleByZoom: (value)=>{ autoPanelScaleByZoom=!!value; S('autoPanelScaleByZoom', autoPanelScaleByZoom); applyPanelScale({ fromZoom: autoPanelScaleByZoom }); syncScaleControls(); },
     borderRadiusPx: (value)=>{
       const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 8, max: 24, fallback: fallbackNumber(borderRadiusPx, 'borderRadiusPx') });
       borderRadiusPx=next; S('borderRadiusPx', next);
@@ -1865,7 +2001,7 @@
         panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
         applyPanelScale();
         setAccent(accent);
-        clampPanelToViewport();
+        ensurePanelWithinViewport();
       }
       if(Array.isArray(g.rules)) { rules=g.rules; S('rules',rules); renderRules(); }
       if('rulesAutoStart' in g){ rulesAutoStart=g.rulesAutoStart; S('rulesAutoStart',rulesAutoStart); panel.querySelector('#tmRulesAutoStart').checked=rulesAutoStart; }
