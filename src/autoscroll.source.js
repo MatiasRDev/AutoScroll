@@ -1279,29 +1279,45 @@
     if(elInfEnabled) elInfEnabled.checked = !!infScrollEnabled;
   }
 
-  function setupInfScroll(){
-    if(!infScrollEnabled || infStop){
-      teardownInfScroll();
-      return;
+    function setupInfScroll(){
+      if(!infScrollEnabled || infStop){
+        teardownInfScroll();
+        return;
+      }
+      if(!document.body) return;
+      if(!sentinel){
+        sentinel=document.createElement('div');
+        sentinel.id='tm-as-sentinel';
+        sentinel.style.cssText='width:1px;height:1px';
+        document.body.appendChild(sentinel);
+      }
+      if(io){
+        io.observe(sentinel);
+        return;
+      }
+      const observerAvailable = typeof IntersectionObserver === 'function';
+      const sentinelMarginPx = Number.isFinite(infScrollSentinelPx) ? infScrollSentinelPx : NaN;
+      if(!observerAvailable || !Number.isFinite(sentinelMarginPx)){
+        console.warn('AutoScroll: IntersectionObserver no disponible o infScrollSentinelPx inválido. Infinite scroll desactivado.');
+        infScrollEnabled=false; S('infScrollEnabled',infScrollEnabled);
+        teardownInfScroll();
+        updateInfStopNotice();
+        return;
+      }
+      try {
+        io=new IntersectionObserver(onSentinel, {
+          root:null,
+          rootMargin:`0px 0px ${sentinelMarginPx}px 0px`,
+          threshold:0
+        });
+        io.observe(sentinel);
+      } catch(err) {
+        console.warn('AutoScroll: no se pudo inicializar IntersectionObserver. Infinite scroll desactivado.', err);
+        infScrollEnabled=false; S('infScrollEnabled',infScrollEnabled);
+        teardownInfScroll();
+        updateInfStopNotice();
+      }
     }
-    if(!document.body) return;
-    if(!sentinel){
-      sentinel=document.createElement('div');
-      sentinel.id='tm-as-sentinel';
-      sentinel.style.cssText='width:1px;height:1px';
-      document.body.appendChild(sentinel);
-    }
-    if(io){
-      io.observe(sentinel);
-      return;
-    }
-    io=new IntersectionObserver(onSentinel, {
-      root:null,
-      rootMargin:`0px 0px ${infScrollSentinelPx}px 0px`,
-      threshold:0
-    });
-    io.observe(sentinel);
-  }
 
   function teardownInfScroll(){
     if(infPollTimer){ clearInterval(infPollTimer); infPollTimer=null; }
