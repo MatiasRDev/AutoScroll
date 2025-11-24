@@ -2,7 +2,7 @@
 // @name         AutoScroll
 // @namespace    https://github.com/MatiasRDev/AutoScroll
 // @version      1.0.1
-// @description  AutoScroll suave con panel configurable: gestos (clics / triple clic), pausa inteligente, tira lateral, secciones, infinite scroll, perfiles por sitio, PSL-lite + override y UI personalizable.
+// @description  AutoScroll es un userscript que desplaza páginas de forma suave y configurable, con panel flotante y perfiles por sitio.
 // @author       Matías Ramírez
 // @license      MIT
 // @match        http*://*/*
