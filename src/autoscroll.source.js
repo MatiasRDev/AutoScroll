@@ -304,7 +304,26 @@
     return rect;
   }
 
-  function clampPanelToViewport(panelEl = panel, { marginPx = VIEW_MARGIN } = {}) {
+  const normalizePanelPos = (pos) => {
+    if (!pos || typeof pos !== 'object') return null;
+    const x = Number.isFinite(pos.x) ? pos.x : Number.isFinite(pos.left) ? pos.left : null;
+    const y = Number.isFinite(pos.y) ? pos.y : Number.isFinite(pos.top) ? pos.top : null;
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+  };
+
+  panelPos = normalizePanelPos(panelPos);
+
+  const getPanelScale = () => Math.max(0.01, panelScalePct) / 100;
+
+  const updatePanelTransform = () => {
+    const scale = getPanelScale();
+    const pos = panelPos || { x: 0, y: 0 };
+    const tx = pos.x / scale;
+    const ty = pos.y / scale;
+    panel.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  };
+
+  function clampPanelToViewport(panelEl = panel, { marginPx = VIEW_MARGIN, persist = false } = {}) {
     const rect = measurePanelRect(panelEl);
     if (!rect) return;
 
@@ -317,13 +336,18 @@
     const maxLeft = Math.max(minLeft, vpRight - rect.width - marginPx);
     const maxTop = Math.max(minTop, vpBottom - rect.height - marginPx);
 
-    const left = clamp(Math.round(rect.left), minLeft, maxLeft);
-    const top  = clamp(Math.round(rect.top),  minTop,  maxTop);
+    const clampedLeft = clamp(Math.round(rect.left), minLeft, maxLeft);
+    const clampedTop  = clamp(Math.round(rect.top),  minTop,  maxTop);
 
-    panelEl.style.right  = 'unset';
-    panelEl.style.bottom = 'unset';
-    panelEl.style.left   = px(left);
-    panelEl.style.top    = px(top);
+    if (!panelPos) {
+      panelPos = { x: rect.left, y: rect.top };
+    }
+    panelPos = {
+      x: panelPos.x + (clampedLeft - rect.left),
+      y: panelPos.y + (clampedTop - rect.top)
+    };
+    updatePanelTransform();
+    if (persist) persistPanelPosition();
   }
 
   function isPanelOutOfViewport(panelEl = panel, { marginPx = VIEW_MARGIN } = {}) {
@@ -339,22 +363,17 @@
     return !(withinHoriz && withinVert);
   }
 
-  function persistPanelPosition(panelEl = panel) {
-    const left = parseFloat(panelEl?.style?.left);
-    const top = parseFloat(panelEl?.style?.top);
-    if (!Number.isFinite(left) || !Number.isFinite(top)) return;
-    panelPos = { left, top };
+  function persistPanelPosition() {
+    if (!panelPos) return;
     S('panelPos', panelPos);
   }
 
   function movePanelToSafeSpot(panelEl = panel, { marginPx = VIEW_MARGIN, persist = true } = {}) {
     const { left: vpLeft, top: vpTop } = getViewportBox();
-    panelEl.style.right  = 'unset';
-    panelEl.style.bottom = 'unset';
-    panelEl.style.left   = px(Math.round(vpLeft + marginPx));
-    panelEl.style.top    = px(Math.round(vpTop + marginPx));
+    panelPos = { x: Math.round(vpLeft + marginPx), y: Math.round(vpTop + marginPx) };
+    updatePanelTransform();
     clampPanelToViewport(panelEl, { marginPx });
-    if (persist) persistPanelPosition(panelEl);
+    if (persist) persistPanelPosition();
   }
 
   function resetPanelPositionToSafeViewport({ marginPx = 20, persist = true } = {}) {
@@ -368,7 +387,7 @@
       movePanelToSafeSpot(panel, { marginPx, persist });
     } else {
       clampPanelToViewport(panel, { marginPx });
-      if (persist) persistPanelPosition(panel);
+      if (persist) persistPanelPosition();
     }
   }
 
@@ -395,7 +414,7 @@
     :root { --tm-bg:#151922cc; --tm-head:#1c2230; --tm-surface:#121724aa; --tm-border:#2b2f3a; --tm-sub:#9fb1c8; --tm-text:#eaeef2; --tm-badge:#313a4d; --tm-badge-b:#3f4961; --tm-ok:#25d07a; --tm-err:#ff6b6b; --tm-accent-bg:#1b6b64; --tm-accent-br:#0e514b; --tm-shadow-a:0.33;}
     .tm-light { --tm-bg:#ffffffea; --tm-head:#f0f2f6; --tm-surface:#f5f7fb; --tm-border:#d8dee9; --tm-sub:#5b677a; --tm-text:#0e1116; --tm-badge:#e7ebf2; --tm-badge-b:#cfd7e6; --tm-ok:#0a8f4a; --tm-err:#c73d3d; --tm-accent-bg:#2d6cdf; --tm-accent-br:#1848a9; }
 
-    .tm-as-panel{position:fixed;z-index:2147483647;right:16px;bottom:16px;font:13px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--tm-text);background:var(--tm-bg);border:1px solid var(--tm-border);border-radius:var(--tm-radius,12px);box-shadow:0 8px 30px rgba(0,0,0,var(--tm-shadow-a));width:var(--tm-width,300px);overflow:hidden;opacity:1;transform:scale(var(--tm-scale,1));transform-origin:bottom right}
+    .tm-as-panel{position:fixed;z-index:2147483647;right:16px;bottom:16px;font:13px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--tm-text);background:var(--tm-bg);border:1px solid var(--tm-border);border-radius:var(--tm-radius,12px);box-shadow:0 8px 30px rgba(0,0,0,var(--tm-shadow-a));width:var(--tm-width,300px);overflow:hidden;opacity:1;transform-origin:top left;transform:translate(0,0) scale(1)}
     .tm-as-panel.compact .tm-as-header{padding:6px 8px}
     .tm-as-panel.compact .tm-sec-head{padding:6px 8px}
     .tm-as-panel.compact .tm-sec-body{padding:8px}
@@ -494,26 +513,39 @@
     } else {
       panelScalePct = clamp(panelScalePct, PANEL_SCALE_MANUAL_MIN, PANEL_SCALE_MANUAL_MAX);
     }
-    panel.style.setProperty('--tm-scale', String(panelScalePct/100));
+    updatePanelTransform();
     syncScaleControls();
     if(withClamp) ensurePanelWithinViewport();
   }
-  applyPanelScale();
   setAccent(accent);
   panel.setAttribute('role','dialog');
   panel.setAttribute('aria-label','AutoScroll');
 
-  const hasStoredPanelPosition = () => panelPos && Number.isFinite(panelPos.left) && Number.isFinite(panelPos.top);
+  const hasStoredPanelPosition = () => Number.isFinite(panelPos?.x) && Number.isFinite(panelPos?.y);
 
   const applyStoredPanelPosition = () => {
-    if(hasStoredPanelPosition()){
-      panel.style.left = px(panelPos.left);
-      panel.style.top = px(panelPos.top);
+    if (hasStoredPanelPosition()) {
+      panel.style.left = '0px';
+      panel.style.top = '0px';
       panel.style.right = 'unset';
       panel.style.bottom = 'unset';
+      updatePanelTransform();
+      return true;
     }
+    const rect = measurePanelRect(panel);
+    if (rect) {
+      panelPos = { x: rect.left, y: rect.top };
+      panel.style.left = '0px';
+      panel.style.top = '0px';
+      panel.style.right = 'unset';
+      panel.style.bottom = 'unset';
+      updatePanelTransform();
+      return true;
+    }
+    return false;
   };
   applyStoredPanelPosition();
+  applyPanelScale();
 
   function setAccent(name){
     const ac = ACCENTS[name] || ACCENTS.teal;
@@ -949,30 +981,27 @@
   function hideEdge(){ if(edgeStrip) edgeStrip.style.display='none'; if(edgeSensor) edgeSensor.style.display='none'; }
 
   /* ------------------------ Panel: mover ------------------------ */
-  (()=>{ 
+  (()=>{
     const header = panel.querySelector('.tm-as-header');
-    let sx=0, sy=0, x=0, y=0, drag=false;
+    let sx=0, sy=0, drag=false, startPos={x:0,y:0};
 
     on(header,'mousedown',e=>{
       if(!e.target.classList.contains('tm-as-drag')) return;
       drag = true;
-      sx = e.clientX; 
+      sx = e.clientX;
       sy = e.clientY;
-      const r = panel.getBoundingClientRect();
-      x = r.left; 
-      y = r.top;
+      const currentPos = panelPos || (()=>{ const r = panel.getBoundingClientRect(); return { x: r.left, y: r.top };})();
+      startPos = { x: currentPos.x, y: currentPos.y };
       e.preventDefault();
     });
 
     on(window,'mousemove',e=>{
       if(!drag) return;
-      const nx = x + (e.clientX - sx);
-      const ny = y + (e.clientY - sy);
-      panel.style.right  = 'unset';
-      panel.style.bottom = 'unset';
-      panel.style.left   = px(nx);
-      panel.style.top    = px(ny);
-      clampPanelToViewport(); // asegura que no se salga mientras arrastras
+      const nx = startPos.x + (e.clientX - sx);
+      const ny = startPos.y + (e.clientY - sy);
+      panelPos = { x: nx, y: ny };
+      updatePanelTransform();
+      clampPanelToViewport(undefined, { persist: false }); // asegura que no se salga mientras arrastras
     });
 
     on(window,'mouseup',()=>{
