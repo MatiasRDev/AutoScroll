@@ -1187,8 +1187,10 @@
     elDomainBtnTxt.textContent = BASE_DOMAIN;
     elSubHostTxt.textContent = HOST;
     elForceSub.disabled = !HAS_SUBDOMAIN;
-    if(!HAS_SUBDOMAIN) elForceSub.checked = false;
-    S('forceSubdomain', elForceSub.checked);
+    if(!HAS_SUBDOMAIN) { elForceSub.checked = false; }
+    else if(forceSubdomain) { elForceSub.checked = true; }
+    forceSubdomain = !!elForceSub.checked;
+    if(HAS_SUBDOMAIN) S('forceSubdomain', forceSubdomain);
     resolveProfilesOnInit(true);
     reflectProfileToUI();
     renderProfileList();
@@ -1504,31 +1506,31 @@
 
   function applyProfile(p){
     if(!p) return;
-    if('speedPxPerSec' in p) speedPxPerSec=p.speedPxPerSec;
-    if('hotkey' in p) hotkeyStr=p.hotkey;
-    if('panelToggleHotkey' in p) panelToggleHotkey=p.panelToggleHotkey;
-    if('quickStepAddPx' in p) quickStepAddPx=p.quickStepAddPx;
-    if('clickToggleEnabled' in p) clickToggleEnabled=p.clickToggleEnabled;
-    if('clickToggleCount' in p) clickToggleCount=p.clickToggleCount;
-    if('clickToggleWindowMs' in p) clickToggleWindowMs=p.clickToggleWindowMs;
-    if('tripleClickAction' in p) tripleClickAction=p.tripleClickAction;
-    if('tripleClickWindowMs' in p) tripleClickWindowMs=p.tripleClickWindowMs;
-
-    if('useEdgeStrip' in p) useEdgeStrip=p.useEdgeStrip;
-    if('edgeSide' in p) edgeSide=p.edgeSide;
-    if('edgeHeightPx' in p) edgeHeightPx=p.edgeHeightPx;
-    if('edgeTopPct' in p) edgeTopPct=p.edgeTopPct;
-    if('edgeWidthPx' in p) edgeWidthPx=p.edgeWidthPx;
-    if('edgeHoverWidthPx' in p) edgeHoverWidthPx=p.edgeHoverWidthPx;
-    if('edgeHoverRangePx' in p) edgeHoverRangePx=p.edgeHoverRangePx;
-    if('edgeAutoHideSec' in p) edgeAutoHideSec=p.edgeAutoHideSec;
-
-    if('infScrollEnabled' in p) infScrollEnabled=p.infScrollEnabled;
-    if('infScrollSentinelPx' in p) infScrollSentinelPx=p.infScrollSentinelPx;
-    if('infScrollTimeoutMs' in p) infScrollTimeoutMs=p.infScrollTimeoutMs;
-    if('infScrollLoaderSel' in p) infScrollLoaderSel=p.infScrollLoaderSel;
-    if('panelScalePct' in p) panelScalePct=clamp(p.panelScalePct,50,250);
-    applyPanelScale();
+    applyConfigValues({
+      speedPxPerSec: p.speedPxPerSec,
+      hotkeyStr: p.hotkey ?? p.hotkeyStr,
+      panelToggleHotkey: p.panelToggleHotkey,
+      quickStepAddPx: p.quickStepAddPx,
+      middlePause: p.middlePause,
+      clickToggleEnabled: p.clickToggleEnabled,
+      clickToggleCount: p.clickToggleCount,
+      clickToggleWindowMs: p.clickToggleWindowMs,
+      tripleClickAction: p.tripleClickAction,
+      tripleClickWindowMs: p.tripleClickWindowMs,
+      useEdgeStrip: p.useEdgeStrip,
+      edgeSide: p.edgeSide,
+      edgeHeightPx: p.edgeHeightPx,
+      edgeTopPct: p.edgeTopPct,
+      edgeWidthPx: p.edgeWidthPx,
+      edgeHoverWidthPx: p.edgeHoverWidthPx,
+      edgeHoverRangePx: p.edgeHoverRangePx,
+      edgeAutoHideSec: p.edgeAutoHideSec,
+      infScrollEnabled: p.infScrollEnabled,
+      infScrollSentinelPx: p.infScrollSentinelPx,
+      infScrollTimeoutMs: p.infScrollTimeoutMs,
+      infScrollLoaderSel: p.infScrollLoaderSel,
+      panelScalePct: p.panelScalePct
+    });
   }
 
   function resolveProfilesOnInit(refreshUI=false){
@@ -1664,6 +1666,7 @@
     };
   }
   const fallbackNumber = (current, key) => Number.isFinite(current) ? current : DEFAULTS[key];
+  const fallbackString = (current, key) => (typeof current === 'string') ? current : DEFAULTS[key];
   const normalizeNumber = (value, { parser = Number, min = -Infinity, max = Infinity, fallback }) => {
     const parsed = parser(value);
     if (!Number.isFinite(parsed)) return fallback;
@@ -1672,6 +1675,40 @@
   };
 
   const CONFIG_SETTERS = {
+    speedPxPerSec: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 1, max: 10000, fallback: fallbackNumber(speedPxPerSec, 'speedPxPerSec') });
+      speedPxPerSec=next; S('speedPxPerSec', next);
+      if(elSpeed){ elSpeed.value=String(next); elSpeedVal.textContent=String(next); }
+    },
+    hotkeyStr: (value)=>{
+      const next = (typeof value === 'string') ? value : fallbackString(hotkeyStr, 'hotkey');
+      hotkeyStr=next; S('hotkey', hotkeyStr); if(elHotkey) elHotkey.value=hotkeyStr;
+    },
+    panelToggleHotkey: (value)=>{
+      const next = (typeof value === 'string') ? value : fallbackString(panelToggleHotkey, 'panelToggleHotkey');
+      panelToggleHotkey=next; S('panelToggleHotkey', panelToggleHotkey); if(elPanelHotkey) elPanelHotkey.value=panelToggleHotkey;
+    },
+    clickToggleEnabled: (value)=>{ clickToggleEnabled=!!value; S('clickToggleEnabled', clickToggleEnabled); },
+    clickToggleCount: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 1, max: 6, fallback: fallbackNumber(clickToggleCount, 'clickToggleCount') });
+      clickToggleCount=next; S('clickToggleCount', next);
+      if(elClickCount) elClickCount.value=String(next);
+    },
+    clickToggleWindowMs: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 100, max: 3000, fallback: fallbackNumber(clickToggleWindowMs, 'clickToggleWindowMs') });
+      clickToggleWindowMs=next; S('clickToggleWindowMs', next);
+      if(elClickWindow) elClickWindow.value=String(next);
+    },
+    tripleClickAction: (value)=>{
+      const allowed=['none','top','bottom','toggleDir'];
+      const next = allowed.includes(value) ? value : fallbackString(tripleClickAction, 'tripleClickAction');
+      tripleClickAction=next; S('tripleClickAction', next); if(elTripleAction) elTripleAction.value=tripleClickAction;
+    },
+    tripleClickWindowMs: (value)=>{
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 200, max: 1500, fallback: fallbackNumber(tripleClickWindowMs, 'tripleClickWindowMs') });
+      tripleClickWindowMs=next; S('tripleClickWindowMs', next); if(elTripleWindow) elTripleWindow.value=String(tripleClickWindowMs);
+    },
+    useEdgeStrip: (value)=>{ useEdgeStrip=!!value; S('useEdgeStrip', useEdgeStrip); },
     quickStepAddPx: (value)=>{
       const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 1, max: 1000, fallback: fallbackNumber(quickStepAddPx, 'quickStepAddPx') });
       quickStepAddPx=next; S('quickStepAddPx', next);
@@ -1799,18 +1836,22 @@
   function importConfig(data){
     try{
       const g=data.globals||{};
-
-      if('speedPxPerSec' in g){ speedPxPerSec=g.speedPxPerSec; S('speedPxPerSec',speedPxPerSec); }
-      if('hotkeyStr' in g){ hotkeyStr=g.hotkeyStr; S('hotkey',hotkeyStr); }
-      if('panelToggleHotkey' in g){ panelToggleHotkey=g.panelToggleHotkey; S('panelToggleHotkey',panelToggleHotkey); }
-      if('useEdgeStrip' in g){ useEdgeStrip=g.useEdgeStrip; S('useEdgeStrip',useEdgeStrip); }
-
-      applyConfigValues({ quickStepAddPx:g.quickStepAddPx, middlePause:g.middlePause });
       applyConfigValues({
+        speedPxPerSec:g.speedPxPerSec,
+        hotkeyStr: g.hotkeyStr ?? g.hotkey,
+        panelToggleHotkey:g.panelToggleHotkey,
+        quickStepAddPx:g.quickStepAddPx,
+        middlePause:g.middlePause,
+        clickToggleEnabled: g.clickToggleEnabled,
+        clickToggleCount: g.clickToggleCount,
+        clickToggleWindowMs: g.clickToggleWindowMs,
+        tripleClickAction: g.tripleClickAction,
+        tripleClickWindowMs: g.tripleClickWindowMs,
+        useEdgeStrip:g.useEdgeStrip,
         edgeSide:g.edgeSide, edgeHeightPx:g.edgeHeightPx, edgeTopPct:g.edgeTopPct,
-        edgeWidthPx:g.edgeWidthPx, edgeHoverWidthPx:g.edgeHoverWidthPx, edgeHoverRangePx:g.edgeHoverRangePx, edgeAutoHideSec:g.edgeAutoHideSec
+        edgeWidthPx:g.edgeWidthPx, edgeHoverWidthPx:g.edgeHoverWidthPx, edgeHoverRangePx:g.edgeHoverRangePx, edgeAutoHideSec:g.edgeAutoHideSec,
+        infScrollEnabled:g.infScrollEnabled, infScrollSentinelPx:g.infScrollSentinelPx, infScrollTimeoutMs:g.infScrollTimeoutMs, infScrollLoaderSel:g.infScrollLoaderSel
       });
-      applyConfigValues({ infScrollEnabled:g.infScrollEnabled, infScrollSentinelPx:g.infScrollSentinelPx, infScrollTimeoutMs:g.infScrollTimeoutMs, infScrollLoaderSel:g.infScrollLoaderSel });
 
       if(g.smart){ applyConfigValues(g.smart); }
       if(g.curves){ applyConfigValues(g.curves); }

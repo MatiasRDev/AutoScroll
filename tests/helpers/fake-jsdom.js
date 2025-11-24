@@ -228,20 +228,27 @@ function createNode(tagName = 'div', ownerDocument, nodeType = 1) {
               return null;
             };
             const match = findById(proxy);
-            if (!match && typeof state.innerHTML === 'string' && state.innerHTML.includes(`id="${targetId}"`)) {
-              const created = createNode('div', ownerDocument);
-              created.id = targetId;
-              created.__setParent?.(proxy);
-              state.children.push(created);
-              return created;
-            }
             if (match) return match;
           }
-          if (!state.selectors.has(selector)) {
-            const child = createNode('div', ownerDocument);
-            state.selectors.set(selector, child);
+          if (state.selectors.has(selector)) {
+            return state.selectors.get(selector);
           }
-          return state.selectors.get(selector);
+          const matchesSelector = (node) => {
+            if (typeof selector !== 'string') return false;
+            if (selector === '*' && node) return true;
+            const tag = selector.toLowerCase();
+            return (node.tagName?.toLowerCase?.() === tag);
+          };
+          const findMatch = (node) => {
+            if (!node) return null;
+            if (matchesSelector(node)) return node;
+            for (const child of node.children ?? []) {
+              const hit = findMatch(child);
+              if (hit) return hit;
+            }
+            return null;
+          };
+          return findMatch(proxy);
         };
       }
       if (prop === 'querySelectorAll') {
@@ -255,8 +262,16 @@ function createNode(tagName = 'div', ownerDocument, nodeType = 1) {
           if (selector === 'html') {
             return makeNodeList(ownerDocument?.documentElement ? [ownerDocument.documentElement] : []);
           }
-          const node = proxy.querySelector(selector);
-          return makeNodeList(node ? [node] : []);
+          const collect = (node, acc = []) => {
+            if (!node) return acc;
+            if (node.querySelector?.(selector) === node) acc.push(node);
+            for (const child of node.children ?? []) {
+              collect(child, acc);
+            }
+            return acc;
+          };
+          const list = collect(proxy, []);
+          return makeNodeList(list);
         };
       }
       if (prop === 'getBoundingClientRect') {
