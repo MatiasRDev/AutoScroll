@@ -320,14 +320,16 @@
   const applyPanelTransform = () => {
     const scale = getPanelScale();
     const pos = panelPos || { x: 0, y: 0 };
-    const tx = pos.x / scale;
-    const ty = pos.y / scale;
-    panel.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    panel.style.left = `${pos.x}px`;
+    panel.style.top = `${pos.y}px`;
+    panel.style.right = 'unset';
+    panel.style.bottom = 'unset';
+    panel.style.transform = `scale(${scale})`;
   };
 
   function persistPanelPosition() {
     if (!panelPos) return;
-    S('panelPos', panelPos);
+    S('panelPos', { left: panelPos.x, top: panelPos.y });
   }
 
   function ensurePanelInViewport({ marginPx = VIEW_MARGIN, persist = true } = {}) {
@@ -367,10 +369,9 @@
   }
 
   function movePanelToSafeSpot(panelEl = panel, { marginPx = VIEW_MARGIN, persist = true } = {}) {
-    const { left: vpLeft, top: vpTop } = getViewportBox();
-    panelPos = { x: Math.round(vpLeft + marginPx), y: Math.round(vpTop + marginPx) };
+    panelPos = { x: Math.round(marginPx), y: Math.round(marginPx) };
     applyPanelTransform();
-    ensurePanelInViewport({ marginPx, persist });
+    ensurePanelInViewport({ marginPx: 0, persist });
   }
 
   function resetPanelPositionToSafeViewport({ marginPx = 20, persist = true } = {}) {
