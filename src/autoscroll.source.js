@@ -69,6 +69,7 @@
     borderRadiusPx: 12,        // 8..24
     compactUI: false,
     panelWidthPx: 300,         // 260..520
+    lockPanelHeightOnExpand: false,
     shadowAlpha: 0.33,         // 0..0.6
     accent: 'teal',            // teal|blue|indigo|amber|pink
     panelPos: null,
@@ -230,6 +231,7 @@
   let borderRadiusPx = G('borderRadiusPx');
   let compactUI = G('compactUI');
   let panelWidthPx = G('panelWidthPx');
+  let lockPanelHeightOnExpand = G('lockPanelHeightOnExpand');
   let shadowAlpha = G('shadowAlpha');
   let accent = G('accent');
 
@@ -318,14 +320,16 @@
   const applyPanelTransform = () => {
     const scale = getPanelScale();
     const pos = panelPos || { x: 0, y: 0 };
-    const tx = pos.x / scale;
-    const ty = pos.y / scale;
-    panel.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    panel.style.left = `${pos.x}px`;
+    panel.style.top = `${pos.y}px`;
+    panel.style.right = 'unset';
+    panel.style.bottom = 'unset';
+    panel.style.transform = `scale(${scale})`;
   };
 
   function persistPanelPosition() {
     if (!panelPos) return;
-    S('panelPos', panelPos);
+    S('panelPos', { left: panelPos.x, top: panelPos.y });
   }
 
   function ensurePanelInViewport({ marginPx = VIEW_MARGIN, persist = true } = {}) {
@@ -365,10 +369,9 @@
   }
 
   function movePanelToSafeSpot(panelEl = panel, { marginPx = VIEW_MARGIN, persist = true } = {}) {
-    const { left: vpLeft, top: vpTop } = getViewportBox();
-    panelPos = { x: Math.round(vpLeft + marginPx), y: Math.round(vpTop + marginPx) };
+    panelPos = { x: Math.round(marginPx), y: Math.round(marginPx) };
     applyPanelTransform();
-    ensurePanelInViewport({ marginPx, persist });
+    ensurePanelInViewport({ marginPx: 0, persist });
   }
 
   function resetPanelPositionToSafeViewport({ marginPx = 20, persist = true } = {}) {
@@ -788,6 +791,9 @@
             </select>
           </div>
           <div class="tm-as-inline">
+            <label class="tm-as-checkbox"><input type="checkbox" id="tmLockPanelHeight" ${lockPanelHeightOnExpand?'checked':''}> <span class="tm-as-label">Bloquear alto del panel (usar scroll interno al abrir secciones)</span></label>
+          </div>
+          <div class="tm-as-inline">
             <label class="tm-as-checkbox"><input type="checkbox" id="tmA11y" ${a11yEnabled?'checked':''}> <span class="tm-as-label">Accesibilidad (Alt+P, ARIA, reducir animaciones)</span></label>
           </div>
         </div>
@@ -913,6 +919,7 @@
     resetPanelPositionToSafeViewport();
   }
   ensurePanelInViewport();
+  if(lockPanelHeightOnExpand) applyPanelHeightLock({ recalcHeight: true });
 
   /* ------------------------ Edge strip + sensor ------------------------ */
   let edgeStrip=null, edgeSensor=null, edgeAutoHideTimer=null;
@@ -1061,6 +1068,7 @@
   const elRadius = panel.querySelector('#tmRadius');
   const elCompact = panel.querySelector('#tmCompact');
   const elWidthPx = panel.querySelector('#tmWidthPx');
+  const elLockPanelHeight = panel.querySelector('#tmLockPanelHeight');
   const elShadow = panel.querySelector('#tmShadow');
   const elAccent = panel.querySelector('#tmAccent');
 
@@ -1087,6 +1095,24 @@
   const elProfSort = panel.querySelector('#tmProfSort');
   const elProfilesList = panel.querySelector('#tmProfilesList');
   const btnProfileSave = panel.querySelector('#tmProfileSave');
+
+  let lockedPanelHeightPx = null;
+  function applyPanelHeightLock({ recalcHeight = false } = {}) {
+    if (!panel || !panel.isConnected) return;
+    if (lockPanelHeightOnExpand) {
+      if (recalcHeight || !lockedPanelHeightPx) {
+        const rect = measurePanelRect(panel);
+        lockedPanelHeightPx = rect ? Math.round(rect.height) : lockedPanelHeightPx;
+      }
+      if (lockedPanelHeightPx) panel.style.height = `${lockedPanelHeightPx}px`;
+      panel.style.overflowY = 'auto';
+    } else {
+      lockedPanelHeightPx = null;
+      panel.style.height = '';
+      panel.style.overflowY = '';
+    }
+    ensurePanelInViewport();
+  }
 
   syncScaleControls = ()=>{
     if(elScaleAuto) elScaleAuto.checked = !!autoPanelScaleByZoom;
@@ -1316,6 +1342,7 @@
   on(elRadius,'change',e=>{ borderRadiusPx=clamp(parseInt(e.target.value)||12,8,24); S('borderRadiusPx',borderRadiusPx); panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`); });
   on(elCompact,'change',e=>{ compactUI=!!e.target.checked; S('compactUI',compactUI); panel.classList.toggle('compact',compactUI); });
   on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); ensurePanelInViewport(); });
+  on(elLockPanelHeight,'change',e=>{ lockPanelHeightOnExpand=!!e.target.checked; S('lockPanelHeightOnExpand',lockPanelHeightOnExpand); applyPanelHeightLock({ recalcHeight: lockPanelHeightOnExpand }); });
   on(elShadow,'change',e=>{ shadowAlpha=clamp(parseFloat(e.target.value)||0.33,0,0.6); S('shadowAlpha',shadowAlpha); panel.style.setProperty('--tm-shadow-a', String(shadowAlpha)); });
   on(elAccent,'change',e=>{ accent=e.target.value; S('accent',accent); setAccent(accent); });
 
@@ -1817,7 +1844,7 @@
         infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel,
         smart: { smartPauseEnabled, smartPause_wheel, smartPause_keys, smartPause_select, smartPause_focusInput, smartResumeMs, smartNoResumeIfInputFocused },
         curves: { rampStartMs, rampStopMs, boostShiftMul, boostCtrlMul, boostAllowCombine, invertDirection },
-        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, panelScalePct, autoPanelScaleByZoom, borderRadiusPx, compactUI, panelWidthPx, shadowAlpha, accent },
+        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, panelScalePct, autoPanelScaleByZoom, borderRadiusPx, compactUI, panelWidthPx, lockPanelHeightOnExpand, shadowAlpha, accent },
         rules, rulesAutoStart,
         profilesConfig: { forceSubdomain, forceSubdomainNoPromptHosts, forceSubdomainDefaultAction },
         psl: { usePslLite, baseDomainOverrides }
@@ -1973,6 +2000,11 @@
     panelWidthPx: (value)=>{
       const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 260, max: 520, fallback: fallbackNumber(panelWidthPx, 'panelWidthPx') });
       panelWidthPx=next; S('panelWidthPx', next);
+    },
+    lockPanelHeightOnExpand: (value)=>{
+      lockPanelHeightOnExpand=!!value; S('lockPanelHeightOnExpand', lockPanelHeightOnExpand);
+      if(elLockPanelHeight) elLockPanelHeight.checked = lockPanelHeightOnExpand;
+      applyPanelHeightLock({ recalcHeight: lockPanelHeightOnExpand });
     },
     shadowAlpha: (value)=>{
       const next = normalizeNumber(value, { parser: (v)=>parseFloat(v), min: 0, max: 0.6, fallback: fallbackNumber(shadowAlpha, 'shadowAlpha') });
