@@ -68,7 +68,9 @@
     autoPanelScaleByZoom: false,
     borderRadiusPx: 12,        // 8..24
     compactUI: false,
+    panelResizable: true,
     panelWidthPx: 300,         // 260..520
+    panelHeightPx: null,
     lockPanelHeightOnExpand: false,
     shadowAlpha: 0.33,         // 0..0.6
     accent: 'teal',            // teal|blue|indigo|amber|pink
@@ -230,7 +232,9 @@
   let fontScalePct = G('fontScalePct');
   let borderRadiusPx = G('borderRadiusPx');
   let compactUI = G('compactUI');
+  let panelResizable = G('panelResizable');
   let panelWidthPx = G('panelWidthPx');
+  let panelHeightPx = G('panelHeightPx');
   let lockPanelHeightOnExpand = G('lockPanelHeightOnExpand');
   let shadowAlpha = G('shadowAlpha');
   let accent = G('accent');
@@ -270,12 +274,15 @@
   const px = (n)=>`${n}px`;
   const on = (el,ev,fn,opt)=>el.addEventListener(ev,fn,opt);
   let syncScaleControls = ()=>{};
+  let applyPanelSize = ()=>{};
 
   // --- Viewport clamp (evita que el panel quede fuera de pantalla) ---
   const VIEW_MARGIN = 8; // margen mínimo interno
 
   const PANEL_SCALE_MANUAL_MIN = 50, PANEL_SCALE_MANUAL_MAX = 250;
   const PANEL_SCALE_AUTO_MIN = 70, PANEL_SCALE_AUTO_MAX = 200;
+  const PANEL_MIN_WIDTH = 260, PANEL_MAX_WIDTH = 520;
+  const PANEL_MIN_HEIGHT = 240, PANEL_MAX_HEIGHT = 1200;
 
   const getViewportBox = () => {
     if (window.visualViewport) {
@@ -314,6 +321,14 @@
   };
 
   panelPos = normalizePanelPos(panelPos);
+
+  const clampPanelWidth = (value) => clamp(value, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
+  const getMaxPanelHeight = () => {
+    const { height } = getViewportBox();
+    const maxByViewport = Math.max(PANEL_MIN_HEIGHT, height - VIEW_MARGIN * 2);
+    return clamp(maxByViewport, PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
+  };
+  const clampPanelHeight = (value) => clamp(value, PANEL_MIN_HEIGHT, getMaxPanelHeight());
 
   const getPanelScale = () => Math.max(0.01, panelScalePct) / 100;
 
@@ -386,6 +401,7 @@
 
   function handleViewportChange(){
     if(autoPanelScaleByZoom){ applyPanelScale({ fromZoom: true, withClamp: false }); }
+    applyPanelSize();
     ensurePanelInViewport();
   }
 
@@ -407,6 +423,8 @@
     .tm-as-panel.compact .tm-sec-head{padding:6px 8px}
     .tm-as-panel.compact .tm-sec-body{padding:8px}
     .tm-as-panel.compact .tm-as-btn{padding:4px 6px}
+    .tm-panel-resize-handle{position:absolute;right:8px;bottom:8px;width:14px;height:14px;border-radius:4px;cursor:se-resize;background:linear-gradient(135deg, var(--tm-border), var(--tm-accent-bg));opacity:.8}
+    .tm-panel-resize-handle:hover{opacity:1}
 
     .tm-as-header{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--tm-head);user-select:none}
     .tm-as-title{font-weight:600}
@@ -481,8 +499,23 @@
   panel.style.opacity = String(clamp(panelOpacity,0.7,1));
   panel.style.fontSize = `${13 * clamp(fontScalePct,80,130)/100}px`;
   panel.style.setProperty('--tm-radius', `${clamp(borderRadiusPx,8,24)}px`);
-  panel.style.setProperty('--tm-width', `${clamp(panelWidthPx,260,520)}px`);
   panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
+
+  applyPanelSize = ({ widthPx = panelWidthPx, heightPx = panelHeightPx } = {}) => {
+    if (Number.isFinite(widthPx)) {
+      panelWidthPx = clampPanelWidth(widthPx);
+      panel.style.setProperty('--tm-width', `${panelWidthPx}px`);
+    }
+    if (Number.isFinite(heightPx)) {
+      panelHeightPx = clampPanelHeight(heightPx);
+      panel.style.height = `${panelHeightPx}px`;
+    } else {
+      panelHeightPx = heightPx;
+      panel.style.height = '';
+    }
+  };
+
+  applyPanelSize();
   const getPageZoom = () => {
     if(window.visualViewport && typeof visualViewport.scale === 'number' && visualViewport.scale>0){
       return visualViewport.scale;
@@ -914,6 +947,18 @@
 
     <div class="tm-as-footer">Estado: <span class="tm-as-status tm-state ${running?'on':'off'}" id="tmFooter">${running?'● Desplazando…':'● Inactivo'}</span></div>
   `;
+
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'tm-panel-resize-handle';
+  resizeHandle.title = 'Redimensionar panel';
+  resizeHandle.setAttribute('aria-hidden','true');
+  panel.appendChild(resizeHandle);
+
+  const syncResizeHandleVisibility = () => {
+    resizeHandle.style.display = panelResizable ? 'block' : 'none';
+  };
+  syncResizeHandleVisibility();
+
   document.documentElement.appendChild(panel);
   if(!hasStoredPanelPosition()){
     resetPanelPositionToSafeViewport();
@@ -973,6 +1018,66 @@
   }
   function showEdge(){ if(!useEdgeStrip) return; createEdge().style.display='block'; createSensor().style.display='block'; styleEdge(); styleSensor(); }
   function hideEdge(){ if(edgeStrip) edgeStrip.style.display='none'; if(edgeSensor) edgeSensor.style.display='none'; }
+
+  /* ------------------------ Panel: resize ------------------------ */
+  (()=>{
+    let dragging=false, startX=0, startY=0, startWidth=0, startHeight=0, nextWidth=panelWidthPx, nextHeight=panelHeightPx;
+    let scale=1, prevUserSelect='';
+
+    const stopDrag = ()=>{
+      if(!dragging) return;
+      dragging=false;
+      document.body.style.userSelect = prevUserSelect;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      if(Number.isFinite(nextWidth)){
+        panelWidthPx = clampPanelWidth(nextWidth);
+        S('panelWidthPx', panelWidthPx);
+        if(elWidthPx) elWidthPx.value = panelWidthPx;
+      }
+      if(Number.isFinite(nextHeight)){
+        panelHeightPx = clampPanelHeight(nextHeight);
+        S('panelHeightPx', panelHeightPx);
+        if(lockPanelHeightOnExpand){
+          lockedPanelHeightPx = panelHeightPx;
+          panel.style.overflowY = 'auto';
+        }
+      }
+      ensurePanelInViewport();
+    };
+
+    const onMove = (e)=>{
+      if(!dragging) return;
+      const deltaX = (e.clientX - startX) / scale;
+      const deltaY = (e.clientY - startY) / scale;
+      nextWidth = clampPanelWidth(startWidth + deltaX);
+      nextHeight = clampPanelHeight(startHeight + deltaY);
+      applyPanelSize({ widthPx: nextWidth, heightPx: nextHeight });
+      ensurePanelInViewport({ persist: false });
+    };
+
+    const onUp = ()=>{ stopDrag(); };
+
+    on(resizeHandle, 'mousedown', (e)=>{
+      if(!panelResizable || e.button!==0) return;
+      const rect = measurePanelRect(panel);
+      if(!rect) return;
+      dragging=true;
+      scale = getPanelScale();
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = rect.width/scale;
+      startHeight = rect.height/scale;
+      nextWidth = startWidth;
+      nextHeight = startHeight;
+      prevUserSelect = document.body.style.userSelect;
+      document.body.style.userSelect='none';
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    });
+  })();
 
   /* ------------------------ Panel: mover ------------------------ */
   (()=>{
@@ -1341,7 +1446,7 @@
   });
   on(elRadius,'change',e=>{ borderRadiusPx=clamp(parseInt(e.target.value)||12,8,24); S('borderRadiusPx',borderRadiusPx); panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`); });
   on(elCompact,'change',e=>{ compactUI=!!e.target.checked; S('compactUI',compactUI); panel.classList.toggle('compact',compactUI); });
-  on(elWidthPx,'change',e=>{ panelWidthPx=clamp(parseInt(e.target.value)||300,260,520); S('panelWidthPx',panelWidthPx); panel.style.setProperty('--tm-width', `${panelWidthPx}px`); ensurePanelInViewport(); });
+  on(elWidthPx,'change',e=>{ panelWidthPx=clampPanelWidth(parseInt(e.target.value)||DEFAULTS.panelWidthPx); S('panelWidthPx',panelWidthPx); applyPanelSize({ widthPx: panelWidthPx }); ensurePanelInViewport(); });
   on(elLockPanelHeight,'change',e=>{ lockPanelHeightOnExpand=!!e.target.checked; S('lockPanelHeightOnExpand',lockPanelHeightOnExpand); applyPanelHeightLock({ recalcHeight: lockPanelHeightOnExpand }); });
   on(elShadow,'change',e=>{ shadowAlpha=clamp(parseFloat(e.target.value)||0.33,0,0.6); S('shadowAlpha',shadowAlpha); panel.style.setProperty('--tm-shadow-a', String(shadowAlpha)); });
   on(elAccent,'change',e=>{ accent=e.target.value; S('accent',accent); setAccent(accent); });
@@ -1844,7 +1949,7 @@
         infScrollEnabled, infScrollSentinelPx, infScrollTimeoutMs, infScrollLoaderSel,
         smart: { smartPauseEnabled, smartPause_wheel, smartPause_keys, smartPause_select, smartPause_focusInput, smartResumeMs, smartNoResumeIfInputFocused },
         curves: { rampStartMs, rampStopMs, boostShiftMul, boostCtrlMul, boostAllowCombine, invertDirection },
-        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, panelScalePct, autoPanelScaleByZoom, borderRadiusPx, compactUI, panelWidthPx, lockPanelHeightOnExpand, shadowAlpha, accent },
+        ui: { theme, panelOpacity, a11yEnabled, fontScalePct, panelScalePct, autoPanelScaleByZoom, borderRadiusPx, compactUI, panelResizable, panelWidthPx, panelHeightPx, lockPanelHeightOnExpand, shadowAlpha, accent },
         rules, rulesAutoStart,
         profilesConfig: { forceSubdomain, forceSubdomainNoPromptHosts, forceSubdomainDefaultAction },
         psl: { usePslLite, baseDomainOverrides }
@@ -1997,9 +2102,22 @@
       borderRadiusPx=next; S('borderRadiusPx', next);
     },
     compactUI: (value)=>{ compactUI=value; S('compactUI', value); },
+    panelResizable: (value)=>{ panelResizable=!!value; S('panelResizable', panelResizable); syncResizeHandleVisibility(); },
     panelWidthPx: (value)=>{
-      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: 260, max: 520, fallback: fallbackNumber(panelWidthPx, 'panelWidthPx') });
-      panelWidthPx=next; S('panelWidthPx', next);
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: PANEL_MIN_WIDTH, max: PANEL_MAX_WIDTH, fallback: fallbackNumber(panelWidthPx, 'panelWidthPx') });
+      panelWidthPx=next; S('panelWidthPx', next); applyPanelSize({ widthPx: panelWidthPx });
+    },
+    panelHeightPx: (value)=>{
+      if(value === null){
+        panelHeightPx = null;
+        S('panelHeightPx', panelHeightPx);
+        applyPanelSize({ heightPx: panelHeightPx });
+        return;
+      }
+      const next = normalizeNumber(value, { parser: (v)=>parseInt(v,10), min: PANEL_MIN_HEIGHT, max: PANEL_MAX_HEIGHT, fallback: Number.isFinite(panelHeightPx) ? panelHeightPx : getMaxPanelHeight() });
+      panelHeightPx=Number.isFinite(next) ? clampPanelHeight(next) : panelHeightPx;
+      S('panelHeightPx', panelHeightPx);
+      applyPanelSize({ heightPx: panelHeightPx });
     },
     lockPanelHeightOnExpand: (value)=>{
       lockPanelHeightOnExpand=!!value; S('lockPanelHeightOnExpand', lockPanelHeightOnExpand);
@@ -2054,7 +2172,7 @@
         panel.style.setProperty('--tm-radius', `${borderRadiusPx}px`);
         panel.classList.toggle('compact',compactUI);
         panel.classList.toggle('tm-light', theme==='light' || (theme==='auto' && matchMedia?.('(prefers-color-scheme: light)').matches));
-        panel.style.setProperty('--tm-width', `${clamp(panelWidthPx,260,520)}px`);
+        applyPanelSize();
         panel.style.setProperty('--tm-shadow-a', String(clamp(shadowAlpha,0,0.6)));
         applyPanelScale();
         setAccent(accent);
