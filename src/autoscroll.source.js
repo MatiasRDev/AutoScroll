@@ -332,6 +332,18 @@
 
   const getPanelScale = () => Math.max(0.01, panelScalePct) / 100;
 
+  const toLogicalPanelRect = (rect) => {
+    if (!rect) return null;
+    const scale = getPanelScale();
+    if (!scale) return null;
+    return {
+      left: rect.left / scale,
+      top: rect.top / scale,
+      width: rect.width / scale,
+      height: rect.height / scale
+    };
+  };
+
   const applyPanelTransform = () => {
     const scale = getPanelScale();
     const pos = panelPos || { x: 0, y: 0 };
@@ -350,15 +362,17 @@
   function ensurePanelInViewport({ marginPx = VIEW_MARGIN, persist = true } = {}) {
     if (!panel || !panel.isConnected) return;
     if (!panelPos) {
-      const initialRect = measurePanelRect(panel);
+      const initialRect = toLogicalPanelRect(measurePanelRect(panel));
       if (!initialRect) return;
-      panelPos = { x: initialRect.left, y: initialRect.top };
+      panelPos = { x: Math.round(initialRect.left), y: Math.round(initialRect.top) };
     }
 
     applyPanelTransform();
 
     const rect = measurePanelRect(panel);
     if (!rect) return;
+    const scale = getPanelScale();
+    if (!scale) return;
 
     const { left: vpLeft, top: vpTop, width: vw, height: vh } = getViewportBox();
     const vpRight = vpLeft + vw;
@@ -373,9 +387,11 @@
     const clampedTop = clamp(Math.round(rect.top), minTop, maxTop);
 
     if (clampedLeft !== rect.left || clampedTop !== rect.top) {
+      const logicalDx = (clampedLeft - rect.left) / scale;
+      const logicalDy = (clampedTop - rect.top) / scale;
       panelPos = {
-        x: panelPos.x + (clampedLeft - rect.left),
-        y: panelPos.y + (clampedTop - rect.top)
+        x: Math.round(panelPos.x + logicalDx),
+        y: Math.round(panelPos.y + logicalDy)
       };
     }
 
@@ -554,9 +570,9 @@
       ensurePanelInViewport({ persist: false });
       return true;
     }
-    const rect = measurePanelRect(panel);
+    const rect = toLogicalPanelRect(measurePanelRect(panel));
     if (rect) {
-      panelPos = { x: rect.left, y: rect.top };
+      panelPos = { x: Math.round(rect.left), y: Math.round(rect.top) };
       panel.style.left = '0px';
       panel.style.top = '0px';
       panel.style.right = 'unset';
@@ -1089,7 +1105,7 @@
       drag = true;
       sx = e.clientX;
       sy = e.clientY;
-      const currentPos = panelPos || (()=>{ const r = panel.getBoundingClientRect(); return { x: r.left, y: r.top };})();
+      const currentPos = panelPos || (()=>{ const r = toLogicalPanelRect(panel.getBoundingClientRect()); return r ? { x: r.left, y: r.top } : { x: 0, y: 0 };})();
       startPos = { x: currentPos.x, y: currentPos.y };
       e.preventDefault();
     });
@@ -1206,7 +1222,7 @@
     if (!panel || !panel.isConnected) return;
     if (lockPanelHeightOnExpand) {
       if (recalcHeight || !lockedPanelHeightPx) {
-        const rect = measurePanelRect(panel);
+        const rect = toLogicalPanelRect(measurePanelRect(panel));
         lockedPanelHeightPx = rect ? Math.round(rect.height) : lockedPanelHeightPx;
       }
       if (lockedPanelHeightPx) panel.style.height = `${lockedPanelHeightPx}px`;
