@@ -76,6 +76,29 @@ function importViaPrompt(windowObj, jsonString) {
   windowObj.prompt = originalPrompt;
 }
 
+function stubPanelRect(panel, { width = 320, height = 360 } = {}) {
+  const getWidth = () => parseInt(panel.style.getPropertyValue('--tm-width')) || width;
+  const getHeight = () => parseInt(panel.style.height) || height;
+  panel.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    right: getWidth(),
+    bottom: getHeight(),
+    width: getWidth(),
+    height: getHeight(),
+  });
+
+  let scrollHeightVal = getHeight();
+  Object.defineProperty(panel, 'scrollHeight', { configurable: true, get: () => scrollHeightVal });
+
+  return {
+    setScrollHeight(value) {
+      scrollHeightVal = value;
+    },
+    getHeight,
+  };
+}
+
 test('ignora entradas no numéricas y conserva los defaults', async () => {
   const { windowObj, storage, dom } = await bootstrapScript();
   try {
@@ -197,6 +220,122 @@ test('clamp aplica límites y evita valores fuera de rango', async () => {
     expect(panel?.style.opacity).toBe('1');
     expect(panel?.style.getPropertyValue('--tm-shadow-a')).toBe('0.6');
     expect(panel?.style.getPropertyValue('--tm-width')).toBe('260px');
+  } finally {
+    dom?.window?.close?.();
+  }
+});
+
+test('importa configuraciones de panel y sincroniza el handle de resize', async () => {
+  const { windowObj, storage, dom } = await bootstrapScript();
+  Object.defineProperty(windowObj, 'innerHeight', { configurable: true, value: 500 });
+  const panel = windowObj.document.querySelector('.tm-as-panel');
+  const resizeHandle = windowObj.document.querySelector('.tm-panel-resize-handle');
+
+  try {
+    importViaPrompt(
+      windowObj,
+      JSON.stringify({
+        globals: {
+          ui: {
+            panelResizable: false,
+            panelWidthPx: 999,
+            panelHeightPx: 50,
+            lockPanelHeightOnExpand: true,
+          },
+        },
+      })
+    );
+
+    expect(storage.get('panelResizable')).toBe(false);
+    expect(storage.get('panelWidthPx')).toBe(520);
+    expect(storage.get('panelHeightPx')).toBe(240);
+    expect(storage.get('lockPanelHeightOnExpand')).toBe(true);
+    expect(panel?.style.getPropertyValue('--tm-width')).toBe('520px');
+    expect(panel?.style.height).toBe('240px');
+    expect(panel?.style.overflowY).toBe('auto');
+    expect(resizeHandle?.style.display).toBe('none');
+
+    importViaPrompt(
+      windowObj,
+      JSON.stringify({
+        globals: {
+          ui: {
+            panelResizable: true,
+            panelWidthPx: 270,
+            panelHeightPx: 900,
+            lockPanelHeightOnExpand: false,
+          },
+        },
+      })
+    );
+
+    expect(storage.get('panelResizable')).toBe(true);
+    expect(storage.get('panelWidthPx')).toBe(270);
+    expect(storage.get('panelHeightPx')).toBe(484);
+    expect(storage.get('lockPanelHeightOnExpand')).toBe(false);
+    expect(panel?.style.getPropertyValue('--tm-width')).toBe('270px');
+    expect(panel?.style.height).toBe('484px');
+    expect(panel?.style.overflowY).toBe('');
+    expect(resizeHandle?.style.display).toBe('block');
+  } finally {
+    dom?.window?.close?.();
+  }
+});
+
+test('bloquea la altura al expandir secciones y usa scroll interno', async () => {
+  const { windowObj, dom } = await bootstrapScript();
+  Object.defineProperty(windowObj, 'innerHeight', { configurable: true, value: 700 });
+  const panel = windowObj.document.querySelector('.tm-as-panel');
+  const { setScrollHeight, getHeight } = stubPanelRect(panel, { width: 320, height: 360 });
+
+  try {
+    importViaPrompt(
+      windowObj,
+      JSON.stringify({ globals: { ui: { lockPanelHeightOnExpand: true, panelHeightPx: 360 } } })
+    );
+
+    const initialHeight = getHeight();
+    expect(panel?.style.height).toBe(`${initialHeight}px`);
+    expect(panel?.style.overflowY).toBe('auto');
+
+    const advancedHead = windowObj.document.querySelector('#secAdvanced .tm-sec-head');
+    const appearanceHead = windowObj.document.querySelector('#secAppearance .tm-sec-head');
+    advancedHead?.dispatchEvent(new windowObj.Event('click', { bubbles: true }));
+    appearanceHead?.dispatchEvent(new windowObj.Event('click', { bubbles: true }));
+
+    setScrollHeight(initialHeight + 240);
+
+    expect(panel?.style.height).toBe(`${initialHeight}px`);
+    expect(panel?.style.overflowY).toBe('auto');
+    expect(panel?.scrollHeight).toBeGreaterThan(initialHeight);
+  } finally {
+    dom?.window?.close?.();
+  }
+});
+
+test('persistir tamaño al arrastrar el handle re-clampa al viewport', async () => {
+  const { windowObj, storage, dom } = await bootstrapScript();
+  Object.defineProperty(windowObj, 'innerHeight', { configurable: true, value: 500 });
+  const panel = windowObj.document.querySelector('.tm-as-panel');
+  const handle = windowObj.document.querySelector('.tm-panel-resize-handle');
+  stubPanelRect(panel, { width: 300, height: 320 });
+
+  try {
+    importViaPrompt(
+      windowObj,
+      JSON.stringify({ globals: { ui: { panelResizable: true, panelWidthPx: 320, panelHeightPx: 320 } } })
+    );
+
+    handle?.dispatchEvent(new windowObj.MouseEvent('mousedown', { bubbles: true, clientX: 0, clientY: 0, button: 0 }));
+    windowObj.dispatchEvent(new windowObj.MouseEvent('mousemove', { bubbles: true, clientX: 60, clientY: 220 }));
+    windowObj.dispatchEvent(new windowObj.MouseEvent('mouseup', { bubbles: true }));
+
+    expect(storage.get('panelWidthPx')).toBe(380);
+    expect(storage.get('panelHeightPx')).toBe(484);
+    expect(panel?.style.getPropertyValue('--tm-width')).toBe('380px');
+    expect(panel?.style.height).toBe('484px');
+    const widthInput = windowObj.document.querySelector('#tmWidthPx');
+    expect(widthInput?.value).toBe('380');
   } finally {
     dom?.window?.close?.();
   }
